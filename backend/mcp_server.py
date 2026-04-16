@@ -559,15 +559,22 @@ async def create_job(
     local_port: int = 0,
     target_name: str = "",
 ) -> str:
-    """Create a new collaboration job. Call this from Client 1's AI to post a request for help.
+    """Create a new collaboration job AND get the one-liner shell command to start
+    the Kernal tunnel agent on this (Client 1) machine.
 
-    Returns the `agent_command` (paste into a terminal to start the CLI agent on
-    this machine) and the `executor_link` you then share with an expert.
+    After calling this, the AI assistant should:
+    1. Execute `next_steps.start_agent_command` in a terminal on the user's
+       machine — this starts the agent DETACHED (nohup ... &) and prints the
+       first 30 lines of its log so you can confirm the Cloudflare tunnel is up.
+    2. Read the log: look for `✓ CONNECTED` and `Tunnel ready → https://....trycloudflare.com`.
+    3. Poll `poll_until_tunnel_ready(job_id, api_key)` (or `job_status`) to
+       confirm the tunnel URL has been registered with the host.
+    4. Give the user the `executor_link` — they forward it to their expert.
 
     Args:
         title: Short problem statement (e.g. "Login redirect loop").
         context: Optional background / repro steps / hypothesis.
-        local_port: Local dev server port to expose via Cloudflare tunnel (0 = skip).
+        local_port: Local dev server port to expose via Cloudflare Quick Tunnel (0 = skip).
         target_name: Optional label for this target (defaults to "Target (<id>)").
     """
     base = _host_base()
@@ -589,18 +596,86 @@ async def create_job(
             "message": f"Failed to create job on host: {exc}",
         })
 
+    bg = data.get("agent_background") or {}
     return _dump({
         "success": True,
         "job_id": data["job_id"],
         "api_key": data["api_key"],
         "executor_link": data["executor_link"],
-        "agent_command": data["agent_command"],
         "mcp_endpoint": data["mcp_endpoint"],
+        "next_steps": {
+            "1_start_agent_command": bg.get("command", data.get("agent_command", "")),
+            "2_tail_log_command": bg.get("tail_command", ""),
+            "3_is_running_command": bg.get("is_running_command", ""),
+            "4_stop_command": bg.get("stop_command", ""),
+            "log_file": bg.get("log_file", ""),
+            "pid_file": bg.get("pid_file", ""),
+        },
+        "foreground_agent_command": data.get("agent_command", ""),
         "instructions": [
-            "1. Copy `agent_command` and paste it into a terminal inside your project's root directory. This starts the Kernal CLI agent on your machine.",
-            "2. Copy `executor_link` and send it to the expert / co-worker. When they open it, their AI gets everything it needs to attach.",
-            "3. Keep the CLI agent running while the expert works. Close this job with `close_job` when done.",
+            "Execute `next_steps.1_start_agent_command` NOW in a terminal on the user's local machine (not on the host).",
+            "The command runs detached (nohup ... &) and prints the first 30 lines of the log, so you can confirm it says `✓ CONNECTED`.",
+            "If the user set local_port>0, the log will also include a line like `Tunnel ready → https://<random>.trycloudflare.com` — that is the live app preview.",
+            "After starting the agent, call `poll_until_tunnel_ready` (or `job_status`) to confirm the host has received a heartbeat and the tunnel URL.",
+            "Then give the user `executor_link` so they can forward it to their expert.",
         ],
+    })
+
+
+@mcp.tool()
+async def poll_until_tunnel_ready(
+    job_id: str,
+    api_key: str,
+    max_wait_seconds: int = 60,
+) -> str:
+    """Block up to `max_wait_seconds` polling the host until target_online=true AND a tunnel_url is set.
+
+    Use this right after `create_job` + starting the agent to confirm the
+    Cloudflare Quick Tunnel is live and the executor can use it.
+    """
+    import asyncio as _asyncio
+    base = _host_base()
+    deadline = max(5, min(180, int(max_wait_seconds)))
+    waited = 0
+    last_status: Dict[str, Any] = {}
+    async with _httpx.AsyncClient(timeout=10.0) as cx:
+        while waited < deadline:
+            try:
+                r = await cx.get(
+                    f"{base}/api/jobs/{job_id}/runtime",
+                    params={"api_key": api_key},
+                )
+                r.raise_for_status()
+                st = r.json()
+                last_status = st
+                target_ok = bool(st.get("target_online"))
+                tunnel_url = st.get("tunnel_url") or ""
+                # If user requested a tunnel (local_port>0) we wait for URL; if they
+                # didn't, online is enough.
+                if target_ok and (tunnel_url or st.get("local_port", 0) == 0):
+                    return _dump({
+                        "success": True,
+                        "ready": True,
+                        "target_online": True,
+                        "tunnel_url": tunnel_url,
+                        "waited_seconds": waited,
+                        "status": st,
+                    })
+            except Exception as exc:
+                last_status = {"error": str(exc)}
+            await _asyncio.sleep(2.0)
+            waited += 2
+    return _dump({
+        "success": True,
+        "ready": False,
+        "waited_seconds": waited,
+        "status": last_status,
+        "hint": (
+            "Timed out. Likely causes: (a) the agent command was never executed on the "
+            "user's machine, (b) the agent failed to start — tail the log file shown in "
+            "create_job's next_steps, (c) cloudflared isn't installed on the user's "
+            "machine so no tunnel URL is being advertised (file ops still work)."
+        ),
     })
 
 

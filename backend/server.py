@@ -1218,7 +1218,7 @@ def _require_job_auth(job_id: str, api_key: Optional[str]) -> dict:
 
 
 def _build_agent_command(public_base: str, job_id: str, api_key: str, local_port: int = 0) -> str:
-    """One-liner the target user can paste into their terminal."""
+    """One-liner the target user can paste into their terminal (foreground)."""
     args = [
         "--host", public_base,
         "--job-id", job_id,
@@ -1233,6 +1233,39 @@ def _build_agent_command(public_base: str, job_id: str, api_key: str, local_port
         f'python3 -m pip install --quiet requests && '
         f'python3 kernal_agent.py {args_str}'
     )
+
+
+def _build_background_command(public_base: str, job_id: str, api_key: str, local_port: int = 0) -> dict:
+    """Detached variant suitable for AI assistants that shouldn't block on the foreground process."""
+    args = [
+        "--host", public_base,
+        "--job-id", job_id,
+        "--api-key", api_key,
+        "--workspace", ".",
+    ]
+    if local_port:
+        args.extend(["--local-port", str(local_port)])
+    args_str = " ".join(args)
+    log_file = f".kernal-agent-{job_id[:8]}.log"
+    pid_file = f".kernal-agent-{job_id[:8]}.pid"
+    cmd = (
+        f'curl -fsSL "{public_base}/api/agent/download" -o kernal_agent.py && '
+        f'python3 -m pip install --quiet requests && '
+        f'nohup python3 kernal_agent.py {args_str} > {log_file} 2>&1 & '
+        f'echo $! > {pid_file} && '
+        f'sleep 3 && '
+        f'echo "--- agent log (first 30 lines) ---" && '
+        f'head -30 {log_file}'
+    )
+    return {
+        "command": cmd,
+        "log_file": log_file,
+        "pid_file": pid_file,
+        "tail_command": f"tail -f {log_file}",
+        "stop_command": f'kill "$(cat {pid_file})" 2>/dev/null && rm -f {pid_file}',
+        "is_running_command": f'[ -f {pid_file} ] && kill -0 "$(cat {pid_file})" 2>/dev/null && echo RUNNING || echo STOPPED',
+    }
+
 
 
 def _build_executor_link(public_base: str, job_id: str, api_key: str) -> str:
@@ -1320,6 +1353,7 @@ async def create_simple_job(body: SimpleJobCreate):
 
     public_base = _public_base_url()
     agent_command = _build_agent_command(public_base, job.id, api_key, body.local_port)
+    agent_background = _build_background_command(public_base, job.id, api_key, body.local_port)
     executor_link = _build_executor_link(public_base, job.id, api_key)
     mcp_config = {
         "mcpServers": {
@@ -1345,6 +1379,7 @@ async def create_simple_job(body: SimpleJobCreate):
         "status": job.status,
         "created_at": job.created_at,
         "agent_command": agent_command,
+        "agent_background": agent_background,
         "executor_link": executor_link,
         "mcp_config": mcp_config,
         "mcp_endpoint": f"{public_base}/api/mcp",
