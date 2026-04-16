@@ -537,3 +537,84 @@ async def job_search_files(job_id: str, api_key: str, pattern: str, path: str = 
         job_id, api_key, "search_files",
         {"pattern": pattern, "path": path},
     ))
+
+
+
+# ═══════════════════════ Client 1-facing: create_job ═══════════════════════
+# Lets the target user's AI agent post a job through the same MCP endpoint
+# without touching the Web UI. Returns the exact `agent_command` to run
+# locally plus the shareable `executor_link` for Client 2.
+
+import httpx as _httpx  # noqa: E402
+
+
+def _host_base() -> str:
+    return os.environ.get("APP_URL", "http://localhost:8001").rstrip("/")
+
+
+@mcp.tool()
+async def create_job(
+    title: str,
+    context: str = "",
+    local_port: int = 0,
+    target_name: str = "",
+) -> str:
+    """Create a new collaboration job. Call this from Client 1's AI to post a request for help.
+
+    Returns the `agent_command` (paste into a terminal to start the CLI agent on
+    this machine) and the `executor_link` you then share with an expert.
+
+    Args:
+        title: Short problem statement (e.g. "Login redirect loop").
+        context: Optional background / repro steps / hypothesis.
+        local_port: Local dev server port to expose via Cloudflare tunnel (0 = skip).
+        target_name: Optional label for this target (defaults to "Target (<id>)").
+    """
+    base = _host_base()
+    payload = {
+        "title": title,
+        "context": context,
+        "local_port": int(local_port) if local_port else 0,
+        "target_name": target_name or "",
+    }
+    try:
+        async with _httpx.AsyncClient(timeout=15.0) as cx:
+            r = await cx.post(f"{base}/api/jobs/simple", json=payload)
+            r.raise_for_status()
+            data = r.json()
+    except _httpx.HTTPError as exc:
+        return _dump({
+            "success": False,
+            "error": "http_error",
+            "message": f"Failed to create job on host: {exc}",
+        })
+
+    return _dump({
+        "success": True,
+        "job_id": data["job_id"],
+        "api_key": data["api_key"],
+        "executor_link": data["executor_link"],
+        "agent_command": data["agent_command"],
+        "mcp_endpoint": data["mcp_endpoint"],
+        "instructions": [
+            "1. Copy `agent_command` and paste it into a terminal inside your project's root directory. This starts the Kernal CLI agent on your machine.",
+            "2. Copy `executor_link` and send it to the expert / co-worker. When they open it, their AI gets everything it needs to attach.",
+            "3. Keep the CLI agent running while the expert works. Close this job with `close_job` when done.",
+        ],
+    })
+
+
+@mcp.tool()
+async def close_job(job_id: str, api_key: str) -> str:
+    """Close a job and revoke the API key. Call when collaboration is done."""
+    base = _host_base()
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as cx:
+            r = await cx.post(
+                f"{base}/api/jobs/{job_id}/close",
+                headers={"x-api-key": api_key},
+            )
+            r.raise_for_status()
+            return _dump({"success": True, **r.json()})
+    except _httpx.HTTPError as exc:
+        return _dump({"success": False, "error": "http_error", "message": str(exc)})
