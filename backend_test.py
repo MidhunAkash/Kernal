@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Backend URL from frontend .env
-BACKEND_URL = "https://supabase-mcp-4.preview.emergentagent.com/api"
+BACKEND_URL = "https://full-stack-runner.preview.emergentagent.com/api"
 
 class MCPTunnelTester:
     def __init__(self):

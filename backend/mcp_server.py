@@ -5,6 +5,7 @@ import os
 import logging
 from datetime import datetime, timezone
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp_tools import (
     ensure_workspace, read_file, write_file, edit_file,
     list_directory, create_directory, delete_file, move_file,
@@ -17,8 +18,18 @@ ensure_workspace()
 
 TUNNEL_URL = os.environ.get("TUNNEL_URL", "https://r8zcdngb-8001.inc1.devtunnels.ms")
 
+# Allow the MCP endpoint to be reached from any host (Emergent preview URL,
+# Dev Tunnel URL, localhost, etc.). Without this, FastMCP rejects requests
+# whose Host header doesn't match 127.0.0.1/localhost with "Invalid Host header".
+_mcp_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=False,
+    allowed_hosts=["*"],
+    allowed_origins=["*"],
+)
+
 mcp = FastMCP(
     "Kernal Workspace",
+    transport_security=_mcp_security,
     instructions=(
         "MCP server for the Kernal project workspace. "
         "Provides sandboxed file operations (read, write, edit, list, search, etc.) "

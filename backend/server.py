@@ -1162,7 +1162,11 @@ async def tunnel_logs(tail: int = 80):
 app.include_router(api_router)
 
 # Mount the MCP Streamable-HTTP sub-app (session manager started in lifespan)
-# Internal route is /mcp, mount at root so final path = /mcp
+# Internal route is /mcp, so mounting at /api makes final path = /api/mcp
+# (needed so the endpoint is reachable through the Emergent preview ingress,
+# which only routes /api/* to the backend).
+app.mount("/api", _mcp_http_app)
+# Also keep the legacy root mount so /mcp continues to work for direct/tunnel clients.
 app.mount("/", _mcp_http_app)
 
 app.add_middleware(
