@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Button from '../components/Button';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = (location.state && location.state.from) || '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,14 +22,14 @@ const Login = () => {
     }
     localStorage.setItem('kernel_auth', 'true');
     localStorage.setItem('kernel_user', email);
-    navigate('/');
+    navigate(redirectTo, { replace: true });
   };
 
   return (
     <div className="auth-wrap">
       <div className="auth-gradient" />
       <div className="auth-inner">
-        <div className="auth-brand">VIBECON.IO</div>
+        <div className="auth-brand">KERNEL</div>
         <h1 className="auth-title">Access the<br/>Work-OS.</h1>
         <p className="auth-sub">Enter your credentials to continue to your workspace.</p>
 
@@ -37,7 +39,7 @@ const Login = () => {
             id="email"
             type="email"
             className="auth-input"
-            placeholder="name@vibecon.io"
+            placeholder="name@kernel.dev"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />

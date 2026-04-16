@@ -15,7 +15,7 @@ const Header = () => {
     <header className="app-header">
       <div className="header-inner">
         <div className="logo" onClick={() => navigate('/')} role="button" tabIndex={0}>
-          <span className="logo-text">VibeCon</span>
+          <span className="logo-text">Kernel</span>
           <span className="logo-dot" />
         </div>
         <nav className="nav-links">

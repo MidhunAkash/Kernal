@@ -1,11 +1,19 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Header from './components/Header';
+import PrivateRoute from './components/PrivateRoute';
 import FindExpert from './pages/FindExpert';
 import JobsListing from './pages/JobsListing';
 import JobDetails from './pages/JobDetails';
 import Login from './pages/Login';
 import Register from './pages/Register';
+
+const PublicOnly = ({ children }) => {
+  const isAuthed =
+    typeof window !== 'undefined' && localStorage.getItem('kernel_auth') === 'true';
+  if (isAuthed) return <Navigate to="/" replace />;
+  return children;
+};
 
 const Shell = () => {
   const location = useLocation();
@@ -15,11 +23,47 @@ const Shell = () => {
       {!hideHeader && <Header />}
       <main>
         <Routes>
-          <Route path="/" element={<FindExpert />} />
-          <Route path="/jobs" element={<JobsListing />} />
-          <Route path="/jobs/:jobId" element={<JobDetails />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <FindExpert />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/jobs"
+            element={
+              <PrivateRoute>
+                <JobsListing />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/jobs/:jobId"
+            element={
+              <PrivateRoute>
+                <JobDetails />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicOnly>
+                <Login />
+              </PublicOnly>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicOnly>
+                <Register />
+              </PublicOnly>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </>

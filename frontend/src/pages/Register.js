@@ -34,7 +34,7 @@ const Register = () => {
     <div className="auth-wrap">
       <div className="auth-gradient" />
       <div className="auth-inner">
-        <div className="auth-brand">VIBECON.IO</div>
+        <div className="auth-brand">KERNEL</div>
         <h1 className="auth-title">Join the<br/>Work-OS.</h1>
         <p className="auth-sub">Create an account to start solving jobs and earn points.</p>
 
@@ -54,7 +54,7 @@ const Register = () => {
             id="email"
             type="email"
             className="auth-input"
-            placeholder="name@vibecon.io"
+            placeholder="name@kernel.dev"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />

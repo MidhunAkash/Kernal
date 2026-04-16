@@ -130,14 +130,14 @@ When user asks any question, only use Human MCP.`;
             <div className="link-icon">🔗</div>
             <div className="link-inset">
               <div className="link-label">Tunnel Link</div>
-              <div className="link-url">https://tunnel.vibecon.io/{job.id}</div>
+              <div className="link-url">https://tunnel.kernel.dev/{job.id}</div>
             </div>
           </div>
           <div className="link-item">
             <div className="link-icon">🌐</div>
             <div className="link-inset">
               <div className="link-label">Preview URL</div>
-              <div className="link-url">https://preview.vibecon.io/{job.id}</div>
+              <div className="link-url">https://preview.kernel.dev/{job.id}</div>
             </div>
           </div>
         </Card>
