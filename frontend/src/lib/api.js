@@ -9,7 +9,16 @@ export const api = {
   // Setup SQL
   setupSql: () => axios.get(`${API}/setup-sql`).then((r) => r.data),
 
-  // MCP Clients
+  // MCP Client Registration (new flow)
+  mcpAdd: (name, role, target_client_id) =>
+    axios.post(`${API}/mcp/add`, { name, role, target_client_id }).then((r) => r.data),
+  mcpConnections: () => axios.get(`${API}/mcp/connections`).then((r) => r.data),
+  mcpConfig: (id) => axios.get(`${API}/mcp/clients/${id}/config`).then((r) => r.data),
+  mcpDelete: (id) => axios.delete(`${API}/mcp/connections/${id}`).then((r) => r.data),
+  mcpHeartbeat: (apiKey, clientId) =>
+    axios.post(`${API}/mcp/heartbeat`, { client_id: clientId }, { headers: { "x-api-key": apiKey } }).then((r) => r.data),
+
+  // Legacy MCP Clients
   listClients: () => axios.get(`${API}/mcp/clients`).then((r) => r.data),
   registerClient: (name, description) =>
     axios.post(`${API}/mcp/clients`, { name, description }).then((r) => r.data),

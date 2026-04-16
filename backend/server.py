@@ -1,10 +1,11 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import json
 import asyncio
 import logging
+import secrets
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
@@ -101,6 +102,26 @@ class MoveFileRequest(BaseModel):
 class ToolCallRequest(BaseModel):
     tool: str
     arguments: Dict[str, Any] = {}
+
+# --- MCP Client Registration models ---
+
+class MCPAddClientRequest(BaseModel):
+    name: str
+    role: str  # "target" or "executor"
+    target_client_id: Optional[str] = None  # required for executor
+
+class MCPRegisteredClient(BaseModel):
+    id: str
+    name: str
+    role: str
+    api_key: str
+    session_id: str
+    status: str
+    created_at: str
+    config: Dict[str, Any] = {}
+
+class MCPHeartbeatRequest(BaseModel):
+    client_id: Optional[str] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -521,6 +542,259 @@ async def list_events(session_id: Optional[str] = None, limit: int = 50):
         return {"events": result.data, "count": len(result.data)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- MCP Client Registration & Config ----------
+
+# In-memory heartbeat tracker: api_key -> last_seen_ts
+_heartbeats: Dict[str, str] = {}
+BACKEND_URL = os.environ.get("APP_URL", "http://localhost:8001")
+
+
+def _generate_api_key() -> str:
+    return f"mcp_{secrets.token_urlsafe(32)}"
+
+
+def _build_mcp_config(client_name: str, role: str, api_key: str, session_id: str) -> dict:
+    """Build the MCP-compatible configuration JSON for a client."""
+    channel_name = f"mcp-session-{session_id}"
+    safe_name = client_name.lower().replace(" ", "-")
+
+    config = {
+        "mcpServers": {
+            f"mcp-tunnel-{safe_name}": {
+                "url": f"{BACKEND_URL}/api",
+                "transport": "supabase-realtime",
+                "apiKey": api_key,
+                "sessionId": session_id,
+                "channelName": channel_name,
+                "role": role,
+                "supabase": {
+                    "url": SUPABASE_URL,
+                    "anonKey": SUPABASE_ANON_KEY,
+                },
+            }
+        }
+    }
+
+    if role == "target":
+        config["mcpServers"][f"mcp-tunnel-{safe_name}"]["tools"] = list(TOOL_SCHEMAS.keys())
+        config["mcpServers"][f"mcp-tunnel-{safe_name}"]["description"] = (
+            "Target MCP server — receives and executes file operation tool calls from connected executors."
+        )
+    else:
+        config["mcpServers"][f"mcp-tunnel-{safe_name}"]["description"] = (
+            "Executor MCP client — sends tool calls to the target via Supabase Realtime broadcast."
+        )
+
+    return config
+
+
+def _parse_client_meta(description: str) -> dict:
+    """Parse JSON metadata stored in the description field."""
+    try:
+        return json.loads(description) if description else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+@api_router.post("/mcp/add")
+async def add_mcp_client(body: MCPAddClientRequest):
+    """Register a new MCP client (target or executor) with auto-generated API key."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    if body.role not in ("target", "executor"):
+        raise HTTPException(status_code=400, detail="role must be 'target' or 'executor'")
+
+    api_key = _generate_api_key()
+    client_id = str(uuid.uuid4())
+    session_id = ""
+
+    if body.role == "target":
+        # Create a new session for this target
+        session_id = str(uuid.uuid4())
+        try:
+            supabase.table("mcp_sessions").insert({
+                "id": session_id,
+                "name": f"session-{body.name}",
+                "channel_name": f"mcp-session-{session_id}",
+                "status": "active",
+                "created_by": client_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create session: {e}")
+
+        # Auto-activate the Realtime listener for Client A
+        asyncio.ensure_future(_auto_activate(session_id))
+
+    elif body.role == "executor":
+        if not body.target_client_id:
+            raise HTTPException(status_code=400, detail="target_client_id required for executor role")
+        # Look up the target's session
+        try:
+            target_row = supabase.table("mcp_clients").select("*").eq("id", body.target_client_id).execute()
+            if not target_row.data:
+                raise HTTPException(status_code=404, detail="Target client not found")
+            target_meta = _parse_client_meta(target_row.data[0].get("description", ""))
+            session_id = target_meta.get("session_id", "")
+            if not session_id:
+                raise HTTPException(status_code=400, detail="Target client has no session")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Build metadata
+    meta = {
+        "role": body.role,
+        "api_key": api_key,
+        "session_id": session_id,
+        "target_client_id": body.target_client_id or "",
+    }
+
+    # Build config
+    config = _build_mcp_config(body.name, body.role, api_key, session_id)
+
+    # Store in DB
+    try:
+        supabase.table("mcp_clients").insert({
+            "id": client_id,
+            "name": body.name,
+            "description": json.dumps(meta),
+            "status": "registered",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "id": client_id,
+        "name": body.name,
+        "role": body.role,
+        "api_key": api_key,
+        "session_id": session_id,
+        "channel_name": f"mcp-session-{session_id}",
+        "status": "registered",
+        "config": config,
+    }
+
+
+async def _auto_activate(session_id: str):
+    """Auto-activate Realtime listener after a short delay."""
+    await asyncio.sleep(1)
+    try:
+        ok = await realtime_handler.join_session(session_id)
+        if ok:
+            logger.info(f"Auto-activated Realtime for session {session_id}")
+    except Exception as e:
+        logger.error(f"Auto-activate failed for {session_id}: {e}")
+
+
+@api_router.get("/mcp/clients/{client_id}/config")
+async def get_client_config(client_id: str):
+    """Get MCP configuration JSON for a registered client."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        result = supabase.table("mcp_clients").select("*").eq("id", client_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Client not found")
+        row = result.data[0]
+        meta = _parse_client_meta(row.get("description", ""))
+        if not meta.get("role"):
+            raise HTTPException(status_code=400, detail="Not an MCP-registered client")
+        config = _build_mcp_config(row["name"], meta["role"], meta["api_key"], meta["session_id"])
+        return {
+            "id": client_id,
+            "name": row["name"],
+            "role": meta["role"],
+            "api_key": meta["api_key"],
+            "session_id": meta["session_id"],
+            "config": config,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/mcp/heartbeat")
+async def mcp_heartbeat(
+    body: MCPHeartbeatRequest = MCPHeartbeatRequest(),
+    x_api_key: Optional[str] = Header(None),
+):
+    """Heartbeat endpoint — clients ping this to report they're alive."""
+    key = x_api_key or ""
+    ts = datetime.now(timezone.utc).isoformat()
+    _heartbeats[key] = ts
+    if body.client_id:
+        _heartbeats[body.client_id] = ts
+    return {"status": "ok", "ts": ts}
+
+
+@api_router.get("/mcp/connections")
+async def get_mcp_connections():
+    """Get all MCP-registered clients with connection status and configs."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        result = supabase.table("mcp_clients").select("*").order("created_at", desc=True).execute()
+        clients = []
+        active_sessions = realtime_handler.list_active_sessions()
+
+        for row in result.data:
+            meta = _parse_client_meta(row.get("description", ""))
+            if not meta.get("role"):
+                continue  # skip legacy clients without role
+
+            session_id = meta.get("session_id", "")
+            is_active = session_id in active_sessions
+            last_heartbeat = _heartbeats.get(meta.get("api_key", "")) or _heartbeats.get(row["id"])
+
+            config = _build_mcp_config(row["name"], meta["role"], meta["api_key"], session_id)
+
+            clients.append({
+                "id": row["id"],
+                "name": row["name"],
+                "role": meta["role"],
+                "api_key": meta["api_key"],
+                "session_id": session_id,
+                "channel_name": f"mcp-session-{session_id}",
+                "status": "connected" if is_active else "disconnected",
+                "realtime_active": is_active,
+                "last_heartbeat": last_heartbeat,
+                "target_client_id": meta.get("target_client_id", ""),
+                "created_at": row.get("created_at", ""),
+                "config": config,
+            })
+
+        return {"clients": clients, "server_client_id": realtime_handler.client_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/mcp/connections/{client_id}")
+async def delete_mcp_connection(client_id: str):
+    """Delete an MCP-registered client and optionally its session."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        row = supabase.table("mcp_clients").select("*").eq("id", client_id).execute()
+        if row.data:
+            meta = _parse_client_meta(row.data[0].get("description", ""))
+            session_id = meta.get("session_id", "")
+            if meta.get("role") == "target" and session_id:
+                await realtime_handler.leave_session(session_id)
+                try:
+                    supabase.table("mcp_sessions").delete().eq("id", session_id).execute()
+                except Exception:
+                    pass
+        supabase.table("mcp_clients").delete().eq("id", client_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "deleted", "id": client_id}
+
 
 # ---------- App wiring ----------
 

@@ -225,6 +225,78 @@ backend:
         agent: "testing"
         comment: "✅ FINAL TEST: Setup SQL endpoint confirmed working. Returns corrected SQL with 'DROP POLICY IF EXISTS' pattern for safe re-execution. All table creation scripts properly formatted."
 
+  - task: "MCP Client Registration - POST /api/mcp/add (target and executor)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: POST /api/mcp/add working perfectly for both target and executor roles. Target client creation generates API key (mcp_ prefix), session_id, channel_name, and complete MCP config with tools list. Executor client correctly links to target's session. All required fields present in response."
+
+  - task: "MCP Connections - GET /api/mcp/connections"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: GET /api/mcp/connections working perfectly. Returns clients list with all required fields: id, name, role, api_key, session_id, config, realtime_active status. Successfully lists both target and executor clients with proper structure."
+
+  - task: "MCP Client Config - GET /api/mcp/clients/<id>/config"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: GET /api/mcp/clients/<id>/config working perfectly. Returns full MCP configuration for specified client including mcpServers structure with url, transport, apiKey, sessionId, channelName, supabase credentials, and tools list."
+
+  - task: "MCP Heartbeat - POST /api/mcp/heartbeat"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: POST /api/mcp/heartbeat working perfectly. Accepts x-api-key header and returns status='ok' with timestamp. Heartbeat tracking functional for client connection monitoring."
+
+  - task: "MCP Connection Deletion - DELETE /api/mcp/connections/<id>"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: DELETE /api/mcp/connections/<id> working perfectly. Successfully deletes client and returns status='deleted' with client ID. Proper cleanup of client records."
+
+  - task: "MCP Validation - Input validation for client registration"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ NEW ENDPOINT TESTED: Input validation working perfectly. Correctly returns 400 for executor role without target_client_id and for invalid role values. Proper error handling implemented."
+
 frontend:
   - task: "Dashboard tab with connection status"
     implemented: true
@@ -288,8 +360,8 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "4.0"
-  test_sequence: 4
+  version: "5.0"
+  test_sequence: 5
   run_ui: false
 
 test_plan:
@@ -307,3 +379,5 @@ agent_communication:
     message: "🎉 FINAL COMPREHENSIVE TESTING COMPLETE - ALL SYSTEMS OPERATIONAL! Tested all 18 backend endpoints with 100% success rate. Key results: (1) Health check shows supabase_connected=true, table_ready=true, (2) All session management working (list/create/get/activate/deactivate/delete), (3) All 9 MCP file tools operational via /api/tools/call, (4) Events audit log working with 2 persisted events, (5) Setup SQL returns corrected scripts. Supabase tables are now fully created and functional. Backend ready for production use."
   - agent: "testing"
     message: "🎉 FRONTEND TESTING COMPLETE - ALL 4 TABS FULLY FUNCTIONAL! Comprehensive UI testing results: (1) Dashboard tab: All 4 status indicators green, Client A ID displayed, active sessions count working, (2) Sessions tab: Create form working, test-tunnel session showing ACTIVE badge, deactivate/delete buttons present, (3) Console tab: Client B console with session input and connect button working, (4) Events tab: 6 persisted events displayed (3 tool-request, 3 tool-response) with tool names (read_file, write_file, list_directory). Tab navigation working perfectly. No console errors. All 23 network requests successful. Application is production-ready!"
+  - agent: "testing"
+    message: "🎯 NEW MCP CLIENT REGISTRATION ENDPOINTS TESTING COMPLETE - 100% SUCCESS! Comprehensive testing of all NEW endpoints requested in review: (1) POST /api/mcp/add - Both target and executor client creation working perfectly with proper API key generation (mcp_ prefix), session management, and complete MCP config structure, (2) GET /api/mcp/connections - Returns all clients with proper structure and realtime status, (3) GET /api/mcp/clients/<id>/config - Full MCP configuration retrieval working, (4) POST /api/mcp/heartbeat - API key authentication and timestamp tracking working, (5) DELETE /api/mcp/connections/<id> - Client deletion working correctly, (6) Input validation - Proper 400 errors for invalid requests, (7) All existing endpoints still functional. All 12 test cases passed with 100% success rate. System is production-ready!"

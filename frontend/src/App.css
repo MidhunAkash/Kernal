@@ -304,3 +304,98 @@ select.inp {
   background-position: right .75rem center;
   padding-right: 2rem;
 }
+
+/* ---- Add Client Buttons ---- */
+.add-a-btn {
+  background: rgba(59,240,138,.12) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+.add-a-btn:hover {
+  background: rgba(59,240,138,.22) !important;
+}
+.add-b-btn {
+  background: rgba(85,153,255,.12) !important;
+  color: #5599ff !important;
+  border-color: #5599ff !important;
+}
+.add-b-btn:hover {
+  background: rgba(85,153,255,.22) !important;
+}
+.add-b-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+/* ---- Add Form ---- */
+.add-form {
+  padding: .6rem 0;
+  border-top: 1px solid var(--border);
+  margin-top: .5rem;
+}
+
+/* ---- Config Card ---- */
+.config-card {
+  border-color: var(--accent);
+  border-width: 1px;
+}
+.config-meta {
+  margin: .4rem 0;
+}
+.config-meta p {
+  margin: .15rem 0;
+  font-size: .75rem;
+}
+.config-json {
+  background: rgba(0,0,0,.35);
+  border-radius: 6px;
+  padding: .65rem .75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .68rem;
+  color: var(--dim);
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+  margin: .5rem 0;
+  border: 1px solid var(--border);
+}
+
+/* ---- Badge variants ---- */
+.badge.target-badge {
+  background: rgba(59,240,138,.12);
+  color: var(--accent);
+}
+.badge.exec-badge {
+  background: rgba(85,153,255,.12);
+  color: #5599ff;
+}
+
+/* ---- Tunnel Pair ---- */
+.tunnel-pair {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .6rem;
+  background: rgba(0,0,0,.15);
+  border-radius: var(--radius);
+  margin-bottom: .4rem;
+  flex-wrap: wrap;
+}
+.pair-client {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
+.pair-arrow {
+  font-size: 1.2rem;
+  color: var(--dim);
+  opacity: .6;
+}
+
+/* ---- Client card expand ---- */
+.client-row {
+  flex-wrap: wrap;
+}
