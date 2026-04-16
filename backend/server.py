@@ -293,7 +293,8 @@ CREATE TABLE IF NOT EXISTS mcp_clients (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE mcp_clients ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "anon_mcp_clients" ON mcp_clients FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_mcp_clients" ON mcp_clients;
+CREATE POLICY "anon_mcp_clients" ON mcp_clients FOR ALL USING (true) WITH CHECK (true);
 
 -- ===================== MCP Sessions =====================
 CREATE TABLE IF NOT EXISTS mcp_sessions (
@@ -305,7 +306,8 @@ CREATE TABLE IF NOT EXISTS mcp_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE mcp_sessions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "anon_mcp_sessions" ON mcp_sessions FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_mcp_sessions" ON mcp_sessions;
+CREATE POLICY "anon_mcp_sessions" ON mcp_sessions FOR ALL USING (true) WITH CHECK (true);
 
 -- ===================== MCP File Events =====================
 CREATE TABLE IF NOT EXISTS mcp_file_events (
@@ -320,12 +322,25 @@ CREATE TABLE IF NOT EXISTS mcp_file_events (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE mcp_file_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "anon_mcp_file_events" ON mcp_file_events FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_mcp_file_events" ON mcp_file_events;
+CREATE POLICY "anon_mcp_file_events" ON mcp_file_events FOR ALL USING (true) WITH CHECK (true);
 
 -- ===================== Realtime Publication =====================
-ALTER PUBLICATION supabase_realtime ADD TABLE mcp_clients;
-ALTER PUBLICATION supabase_realtime ADD TABLE mcp_sessions;
-ALTER PUBLICATION supabase_realtime ADD TABLE mcp_file_events;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE mcp_clients;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE mcp_sessions;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE mcp_file_events;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 """
     }
 
