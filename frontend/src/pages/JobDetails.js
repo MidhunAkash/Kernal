@@ -5,23 +5,89 @@ import Button from '../components/Button';
 import ChatUI from '../components/ChatUI';
 import { mockJobs, mockMCPConfig, initialChatMessages } from '../data/mockData';
 
+const APPROVAL_DELAY_MS = 3000;
+const storageKey = (jobId) => `kernel_job_state_${jobId}`;
+
+const readJobState = (jobId) => {
+  try {
+    const raw = localStorage.getItem(storageKey(jobId));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const writeJobState = (jobId, state) => {
+  try {
+    localStorage.setItem(storageKey(jobId), JSON.stringify(state));
+  } catch {
+    /* ignore */
+  }
+};
+
+const clearJobState = (jobId) => {
+  try {
+    localStorage.removeItem(storageKey(jobId));
+  } catch {
+    /* ignore */
+  }
+};
+
 const JobDetails = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
 
   const job = useMemo(() => mockJobs.find((j) => j.id === jobId), [jobId]);
 
-  const [isAccepted, setIsAccepted] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isApproved, setIsApproved] = useState(false);
+  // Hydrate initial state from localStorage so refresh preserves progress.
+  const persisted = useMemo(() => readJobState(jobId) || {}, [jobId]);
+  const [isAccepted, setIsAccepted] = useState(!!persisted.isAccepted);
+  const [isSubmitted, setIsSubmitted] = useState(!!persisted.isSubmitted);
+  const [isApproved, setIsApproved] = useState(!!persisted.isApproved);
+  const [submittedAt, setSubmittedAt] = useState(persisted.submittedAt || null);
 
+  // Persist state to localStorage on every change.
   useEffect(() => {
-    let t;
-    if (isSubmitted && !isApproved) {
-      t = setTimeout(() => setIsApproved(true), 3000);
+    if (!jobId) return;
+    // If nothing happened yet, don't write empty state.
+    if (!isAccepted && !isSubmitted && !isApproved) return;
+    writeJobState(jobId, { isAccepted, isSubmitted, isApproved, submittedAt });
+  }, [jobId, isAccepted, isSubmitted, isApproved, submittedAt]);
+
+  // Handle the pending-approval timer in a refresh-safe way.
+  // If submittedAt was set before the page reloaded, resume the timer using
+  // the remaining time; if the 3s has already elapsed, approve immediately.
+  useEffect(() => {
+    if (!isSubmitted || isApproved) return;
+    const startedAt = submittedAt || Date.now();
+    if (!submittedAt) setSubmittedAt(startedAt);
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, APPROVAL_DELAY_MS - elapsed);
+    if (remaining === 0) {
+      setIsApproved(true);
+      return;
     }
+    const t = setTimeout(() => setIsApproved(true), remaining);
     return () => clearTimeout(t);
-  }, [isSubmitted, isApproved]);
+  }, [isSubmitted, isApproved, submittedAt]);
+
+  const handleAccept = () => setIsAccepted(true);
+  const handleSubmit = () => {
+    setIsSubmitted(true);
+    setSubmittedAt(Date.now());
+  };
+  const handleStartOver = () => {
+    clearJobState(jobId);
+    setIsAccepted(false);
+    setIsSubmitted(false);
+    setIsApproved(false);
+    setSubmittedAt(null);
+  };
+  const handleBrowseMore = () => {
+    // Keep approved jobs in storage so they show as approved if revisited.
+    navigate('/jobs');
+  };
 
   if (!job) {
     return (
@@ -63,9 +129,12 @@ When user asks any question, only use Human MCP.`;
             <div className="reward-inset-label">Reward Points Credited</div>
             <div className="reward-inset-value">+{job.rewardPoints} pts</div>
           </div>
-          <Button variant="primary" className="wide-btn" onClick={() => navigate('/jobs')}>
+          <Button variant="primary" className="wide-btn" onClick={handleBrowseMore}>
             Browse More Jobs
           </Button>
+          <button type="button" className="link-btn" onClick={handleStartOver}>
+            Reset this job
+          </button>
         </Card>
       </div>
     );
@@ -102,12 +171,17 @@ When user asks any question, only use Human MCP.`;
           <span className="breadcrumb-current">{job.id}</span>
         </div>
 
-        <div className="accepted-header">
-          <h2 className="accepted-title">
-            Job Accepted
-            <span className="job-id-badge inline-badge">{job.id}</span>
-          </h2>
-          <p className="accepted-sub">{job.jobName}</p>
+        <div className="accepted-header accepted-header-row">
+          <div>
+            <h2 className="accepted-title">
+              Job Accepted
+              <span className="job-id-badge inline-badge">{job.id}</span>
+            </h2>
+            <p className="accepted-sub">{job.jobName}</p>
+          </div>
+          <button type="button" className="link-btn" onClick={handleStartOver}>
+            Reset this job
+          </button>
         </div>
 
         <div className="config-section">
@@ -145,11 +219,7 @@ When user asks any question, only use Human MCP.`;
         <ChatUI messages={initialChatMessages} />
 
         <div className="submit-row">
-          <Button
-            variant="primary"
-            className="wide-btn"
-            onClick={() => setIsSubmitted(true)}
-          >
+          <Button variant="primary" className="wide-btn" onClick={handleSubmit}>
             Submit Solution &rarr;
           </Button>
         </div>
@@ -178,7 +248,7 @@ When user asks any question, only use Human MCP.`;
         <p className="problem-text">{job.problemStatement}</p>
 
         <div className="action-row">
-          <Button variant="primary" onClick={() => setIsAccepted(true)}>
+          <Button variant="primary" onClick={handleAccept}>
             ✅ Accept Job
           </Button>
           <Button variant="secondary" onClick={() => navigate('/jobs')}>
