@@ -20,9 +20,41 @@ function App() {
 }`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(mcpConfig);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(mcpConfig)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {
+          // Fallback to older method
+          fallbackCopy();
+        });
+    } else {
+      // Use fallback for browsers that don't support clipboard API
+      fallbackCopy();
+    }
+  };
+
+  const fallbackCopy = () => {
+    // Create a temporary textarea element
+    const textarea = document.createElement('textarea');
+    textarea.value = mcpConfig;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+    
+    document.body.removeChild(textarea);
   };
 
   const scrollToIntegration = () => {
