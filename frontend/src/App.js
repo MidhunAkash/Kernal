@@ -1,7 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
 
 function App() {
+  const [copied, setCopied] = useState(false);
+
+  const mcpConfig = `{
+  "mcpServers": {
+    "kernal": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@kernal/mcp-server"
+      ],
+      "env": {
+        "KERNAL_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(mcpConfig);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="App bg-white text-black">
       {/* Header */}
@@ -45,96 +68,159 @@ function App() {
         </div>
       </section>
 
-      {/* Three Steps Section */}
+      {/* Works With Section */}
+      <section className="border-t border-b border-gray-200 py-12 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h3 className="text-center text-sm font-semibold text-gray-500 mb-8 tracking-wider">WORKS WITH</h3>
+          <div className="flex justify-center items-center gap-16 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">L</span>
+              </div>
+              <span className="text-2xl font-bold">Lovable</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">E</span>
+              </div>
+              <span className="text-2xl font-bold">Emergent</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">C</span>
+              </div>
+              <span className="text-2xl font-bold">Cursor</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Three Steps Section - Vertical with Illustration */}
       <section className="bg-gray-50 py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-center mb-20">
             Three steps to resolution.
           </h2>
-          <div className="grid md:grid-cols-3 gap-12 relative">
-            {/* Step 1 */}
-            <div className="relative group" data-testid="step-ai-hit-wall">
-              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
-                  1
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            {/* Steps - Vertical */}
+            <div className="space-y-8">
+              {/* Step 1 */}
+              <div className="relative group" data-testid="step-ai-hit-wall">
+                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                  <div className="flex items-start gap-6">
+                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                      1
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-3">AI Hit a Wall</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold mb-4 mt-2">AI Hit a Wall</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
-                </p>
               </div>
-              {/* Arrow for desktop */}
-              <div className="hidden md:block absolute -right-6 top-1/2 transform -translate-y-1/2 text-4xl text-gray-300">
-                →
+
+              {/* Step 2 */}
+              <div className="relative group" data-testid="step-escalate">
+                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                  <div className="flex items-start gap-6">
+                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                      2
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-3">Escalate Instantly</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="relative group" data-testid="step-problem-solved">
+                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                  <div className="flex items-start gap-6">
+                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                      3
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-3">Problem Solved</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Step 2 */}
-            <div className="relative group" data-testid="step-escalate">
-              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
-                  2
+            {/* Illustration */}
+            <div className="bg-white p-12 border-2 border-gray-200 rounded-lg flex items-center justify-center min-h-[500px]">
+              <div className="text-center space-y-6">
+                <div className="relative">
+                  {/* AI Icon */}
+                  <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-4">
+                    <span className="text-4xl">🤖</span>
+                  </div>
+                  <div className="text-4xl mb-4">↓</div>
+                  {/* Human Icon */}
+                  <div className="w-24 h-24 bg-black rounded-full mx-auto flex items-center justify-center mb-4">
+                    <span className="text-4xl">👤</span>
+                  </div>
+                  <div className="text-4xl mb-4">↓</div>
+                  {/* Success Icon */}
+                  <div className="w-24 h-24 bg-green-500 rounded-full mx-auto flex items-center justify-center">
+                    <span className="text-4xl">✓</span>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold mb-4 mt-2">Escalate Instantly</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
-                </p>
-              </div>
-              {/* Arrow for desktop */}
-              <div className="hidden md:block absolute -right-6 top-1/2 transform -translate-y-1/2 text-4xl text-gray-300">
-                →
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="relative group" data-testid="step-problem-solved">
-              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
-                  3
-                </div>
-                <h3 className="text-2xl font-bold mb-4 mt-2">Problem Solved</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
-                </p>
+                <p className="text-gray-600 font-medium">AI → Human → Solution</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* For Builders / For Solvers Section */}
+      {/* For Stuck People / For Solvers Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-8">
-            {/* For Builders */}
-            <div className="bg-black text-white p-12" data-testid="for-builders-section">
-              <h2 className="text-3xl font-bold mb-6">FOR BUILDERS</h2>
+            {/* For People Stuck */}
+            <div className="bg-black text-white p-12" data-testid="for-stuck-section">
+              <h2 className="text-3xl font-bold mb-6">FOR PEOPLE STUCK</h2>
+              <p className="text-gray-300 mb-6">
+                When you hit a roadblock and need expert help fast, Kernal connects you with skilled solvers who can unblock you.
+              </p>
               <ul className="space-y-4 text-gray-300">
                 <li className="flex items-start">
                   <span className="mr-3">—</span>
-                  <span>Integrate in minutes with one API call or SDK method</span>
+                  <span>Get unstuck in minutes, not hours</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-3">—</span>
-                  <span>Only pay when a task is solved</span>
+                  <span>Pay only when your problem is solved</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-3">—</span>
-                  <span>No contract. Cancel any time</span>
+                  <span>Access expert help 24/7</span>
                 </li>
               </ul>
-              <button className="mt-8 border-2 border-white text-white px-8 py-3 font-medium hover:bg-white hover:text-black transition" data-testid="start-building-footer-btn">
-                START BUILDING
+              <button className="mt-8 border-2 border-white text-white px-8 py-3 font-medium hover:bg-white hover:text-black transition" data-testid="get-help-btn">
+                GET HELP NOW
               </button>
             </div>
 
             {/* For Solvers */}
             <div className="bg-gray-50 p-12" data-testid="for-solvers-section">
               <h2 className="text-3xl font-bold mb-6">FOR SOLVERS</h2>
+              <p className="text-gray-700 mb-6">
+                Use your expertise to help others while earning money on your own schedule.
+              </p>
               <ul className="space-y-4 text-gray-700">
                 <li className="flex items-start">
                   <span className="mr-3">—</span>
-                  <span>Earn by solving real-world AI edge cases</span>
+                  <span>Earn by solving real-world problems</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-3">—</span>
@@ -153,95 +239,27 @@ function App() {
         </div>
       </section>
 
-      {/* Add Human Layer Section */}
+      {/* MCP Configuration Section */}
       <section className="bg-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-center mb-12">
-            ADD HUMAN LAYER IN SECONDS
+            INTEGRATE IN SECONDS
           </h2>
           <p className="text-center text-gray-600 text-lg mb-12 max-w-3xl mx-auto">
-            Drop in our SDK or call our API. When your AI can't proceed, escalate to humans in one line of code.
+            Add Kernal to your MCP configuration and start escalating stuck tasks immediately.
           </p>
           <div className="max-w-4xl mx-auto">
-            <div className="bg-gray-900 text-green-400 p-8 rounded font-mono text-sm overflow-x-auto" data-testid="code-snippet">
-              <pre>
-                <code>{`import { HumanLayer } from '@humanlayer/sdk';
-
-const hl = new HumanLayer({ apiKey: process.env.HL_API_KEY });
-
-// When AI gets stuck:
-const solution = await hl.escalate({
-  taskDescription: "Summarize this ambiguous email",
-  context: { emailBody: "..." },
-  bounty: 5 // dollars
-});
-
-console.log(solution.result);`}</code>
-              </pre>
-            </div>
-            <div className="text-center mt-8">
-              <button className="bg-black text-white px-8 py-4 text-lg font-medium hover:bg-gray-800" data-testid="view-docs-btn">
-                VIEW DOCS
+            <div className="relative bg-gray-900 text-green-400 p-8 rounded font-mono text-sm overflow-x-auto" data-testid="code-snippet">
+              <button
+                onClick={handleCopy}
+                className="absolute top-4 right-4 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-xs font-sans transition"
+                data-testid="copy-button"
+              >
+                {copied ? '✓ Copied!' : 'Copy'}
               </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Recent Bounties Section */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl md:text-4xl font-bold">Recent Bounties</h2>
-            <a href="#" className="text-sm underline hover:no-underline">VIEW ALL →</a>
-          </div>
-          <div className="space-y-4" data-testid="bounties-list">
-            <div className="bg-white border border-gray-200 p-6 flex justify-between items-center hover:border-gray-400 transition" data-testid="bounty-item">
-              <div className="flex-1">
-                <div className="flex items-center gap-4">
-                  <span className="text-gray-400 text-sm">#01</span>
-                  <h3 className="font-bold text-lg">Fix React useEffect loop</h3>
-                </div>
-                <p className="text-gray-600 text-sm mt-2 ml-12">Component re-renders infinitely. Need help identifying the dependency issue.</p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold">$20</div>
-                <button className="mt-2 text-sm border border-black px-4 py-1 hover:bg-black hover:text-white transition" data-testid="claim-bounty-btn">
-                  CLAIM
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 p-6 flex justify-between items-center hover:border-gray-400 transition" data-testid="bounty-item">
-              <div className="flex-1">
-                <div className="flex items-center gap-4">
-                  <span className="text-gray-400 text-sm">#02</span>
-                  <h3 className="font-bold text-lg">Optimize postgres SQL join</h3>
-                </div>
-                <p className="text-gray-600 text-sm mt-2 ml-12">Query taking 30s+. Three tables, 100k rows each. Need indexing advice.</p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold">$120</div>
-                <button className="mt-2 text-sm border border-black px-4 py-1 hover:bg-black hover:text-white transition" data-testid="claim-bounty-btn">
-                  CLAIM
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 p-6 flex justify-between items-center hover:border-gray-400 transition" data-testid="bounty-item">
-              <div className="flex-1">
-                <div className="flex items-center gap-4">
-                  <span className="text-gray-400 text-sm">#03</span>
-                  <h3 className="font-bold text-lg">Explain AWS Auth flow</h3>
-                </div>
-                <p className="text-gray-600 text-sm mt-2 ml-12">Getting 403 on S3. Cognito + IAM roles. Can someone walk through this?</p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold">$40</div>
-                <button className="mt-2 text-sm border border-black px-4 py-1 hover:bg-black hover:text-white transition" data-testid="claim-bounty-btn">
-                  CLAIM
-                </button>
-              </div>
+              <pre>
+                <code>{mcpConfig}</code>
+              </pre>
             </div>
           </div>
         </div>
@@ -250,18 +268,18 @@ console.log(solution.result);`}</code>
       {/* Footer CTA */}
       <section className="bg-black text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight mb-12">
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight mb-8">
             NEVER GET STUCK<br />AGAIN.
           </h2>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
-            <input
-              type="email"
-              placeholder="YOUR EMAIL"
-              className="flex-1 px-6 py-4 bg-white text-black placeholder-gray-400 text-center"
-              data-testid="footer-email-input"
-            />
-            <button className="bg-white text-black px-8 py-4 font-medium hover:bg-gray-200" data-testid="join-us-btn">
-              JOIN US
+          <p className="text-gray-300 text-lg mb-12 max-w-2xl mx-auto">
+            Join thousands of developers who are building better AI products with human-in-the-loop support.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button className="bg-white text-black px-12 py-4 text-lg font-medium hover:bg-gray-200 transition" data-testid="cta-start-btn">
+              START NOW
+            </button>
+            <button className="border-2 border-white text-white px-12 py-4 text-lg font-medium hover:bg-white hover:text-black transition" data-testid="cta-learn-btn">
+              LEARN MORE
             </button>
           </div>
         </div>
