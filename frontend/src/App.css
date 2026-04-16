@@ -676,14 +676,7 @@ main {
   overflow: hidden;
 }
 .auth-gradient {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 260px;
-  background: linear-gradient(180deg, #1a1a1a 0%, #2a2a2a 18%, rgba(180,180,180,0.35) 55%, #ffffff 100%);
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 .auth-corner {
   position: absolute;
@@ -702,7 +695,7 @@ main {
   z-index: 1;
   max-width: 420px;
   margin: 0 auto;
-  padding: 180px 1.5rem 4rem;
+  padding: 80px 1.5rem 4rem;
 }
 .auth-brand {
   font-size: 0.8rem;
@@ -993,7 +986,7 @@ main {
   .jobs-grid { grid-template-columns: 1fr; }
   .hero-title { font-size: 1.85rem; }
   .auth-title { font-size: 2rem; }
-  .auth-inner { padding-top: 160px; }
+  .auth-inner { padding-top: 64px; }
   .page-heading { font-size: 1.5rem; }
   .detail-title { font-size: 1.35rem; }
   .nav-links { gap: 1rem; }
