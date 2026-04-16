@@ -46,29 +46,57 @@ function App() {
       </section>
 
       {/* Three Steps Section */}
-      <section className="bg-gray-50 py-20">
+      <section className="bg-gray-50 py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-center mb-20">
             Three steps to resolution.
           </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 border border-gray-200" data-testid="step-ai-hit-wall">
-              <h3 className="text-2xl font-bold mb-4">AI Hit a Wall</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
-              </p>
+          <div className="grid md:grid-cols-3 gap-12 relative">
+            {/* Step 1 */}
+            <div className="relative group" data-testid="step-ai-hit-wall">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
+                  1
+                </div>
+                <h3 className="text-2xl font-bold mb-4 mt-2">AI Hit a Wall</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
+                </p>
+              </div>
+              {/* Arrow for desktop */}
+              <div className="hidden md:block absolute -right-6 top-1/2 transform -translate-y-1/2 text-4xl text-gray-300">
+                →
+              </div>
             </div>
-            <div className="bg-white p-8 border border-gray-200" data-testid="step-escalate">
-              <h3 className="text-2xl font-bold mb-4">Escalate Instantly</h3>
-              <p className="text-gray-600 leading-relaxed">
-                With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
-              </p>
+
+            {/* Step 2 */}
+            <div className="relative group" data-testid="step-escalate">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
+                  2
+                </div>
+                <h3 className="text-2xl font-bold mb-4 mt-2">Escalate Instantly</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
+                </p>
+              </div>
+              {/* Arrow for desktop */}
+              <div className="hidden md:block absolute -right-6 top-1/2 transform -translate-y-1/2 text-4xl text-gray-300">
+                →
+              </div>
             </div>
-            <div className="bg-white p-8 border border-gray-200" data-testid="step-problem-solved">
-              <h3 className="text-2xl font-bold mb-4">Problem Solved</h3>
-              <p className="text-gray-600 leading-relaxed">
-                A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
-              </p>
+
+            {/* Step 3 */}
+            <div className="relative group" data-testid="step-problem-solved">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
+                <div className="absolute -top-6 -left-6 w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black">
+                  3
+                </div>
+                <h3 className="text-2xl font-bold mb-4 mt-2">Problem Solved</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
+                </p>
+              </div>
             </div>
           </div>
         </div>
