@@ -63,41 +63,85 @@ export function buildVscodeMcpConfig(publicBackendUrl) {
 }
 
 /**
+ * Standard mcpServers format for non-VS-Code clients (Cursor, Windsurf, Claude Desktop, etc.)
+ */
+export function buildMcpServersConfig(publicBackendUrl) {
+  const base = (publicBackendUrl || "").replace(/\/+$/, "");
+  return {
+    mcpServers: {
+      "kernal-workspace": {
+        url: `${base}/mcp`,
+      },
+    },
+  };
+}
+
+/**
  * Minimal prompt the other client can paste into an MCP-capable agent
  * to clone this workspace using the direct /mcp endpoint.
+ * Includes connection setup instructions with status check workflow.
  */
 export function buildWorkspaceClonePrompt({ publicBackendUrl, previewUrl }) {
   const base = (publicBackendUrl || "").replace(/\/+$/, "");
   const mcpUrl = `${base}/mcp`;
   const lines = [
-    "# Clone the Kernal workspace via MCP",
+    "# Connect to the Kernal workspace via MCP",
     "",
-    "## MCP connection",
-    `Connect your MCP client to: ${mcpUrl}`,
+    "## Step 1 — Add MCP server",
     "",
-    "Add the following to your .vscode/mcp.json (or equivalent):",
+    "Add one of these configs depending on your client:",
+    "",
+    "**VS Code** (.vscode/mcp.json):",
     "```json",
     JSON.stringify(buildVscodeMcpConfig(publicBackendUrl), null, 2),
     "```",
     "",
-    "## Instructions",
-    "1. Connect to the MCP server above.",
-    "2. Call `workspace_list_directory` (path='.') to see the full project tree.",
-    "3. Read each file using `workspace_read_file` and recreate it locally, preserving paths exactly.",
-    "4. Do NOT modify the remote workspace — only read.",
+    "**Other clients** (Cursor, Windsurf, Claude Desktop — mcpServers format):",
+    "```json",
+    JSON.stringify(buildMcpServersConfig(publicBackendUrl), null, 2),
+    "```",
+    "",
+    "## Step 2 — Check connection (REQUIRED FIRST STEP)",
+    "",
+    "Before using any file tools, call:",
+    "```",
+    "workspace_status_check(job_id=\"none\")",
+    "```",
+    "",
+    "Read the `instructions` array in the response. It will tell you:",
+    "- If the connection is healthy → proceed to use tools",
+    "- If the tunnel needs to be trusted → open the URL it gives you in a browser",
+    `  (${base}) and click \"Continue\" on the Microsoft Dev Tunnels trust page`,
+    "- If the backend is down → instructions on how to restart it",
+    "",
+    "**If the tunnel is not trusted**, open this URL in your browser first:",
+    `${base}`,
+    "",
+    "Then call workspace_status_check again. Once it returns `\"connection\": \"ok\"`,",
+    "you can use all tools.",
+    "",
+    "## Step 3 — Use workspace tools",
+    "",
+    "Available tools after connection is verified:",
+    "- `workspace_list_directory(path)` — list files/folders",
+    "- `workspace_read_file(path)` — read file contents",
+    "- `workspace_write_file(path, content)` — create/overwrite a file",
+    "- `workspace_edit_file(path, old_text, new_text)` — search-and-replace",
+    "- `workspace_create_directory(path)` — create directory",
+    "- `workspace_delete_file(path)` — delete file/folder",
+    "- `workspace_move_file(source, destination)` — move/rename",
+    "- `workspace_get_file_info(path)` — file metadata",
+    "- `workspace_search_files(pattern, path)` — glob search",
+    "- `workspace_status_check(job_id)` — check connection & peer status",
+    "",
+    "Start with `workspace_status_check`, then `workspace_list_directory(\".\")` to see the project tree.",
   ];
 
   if (previewUrl) {
-    lines.push(`5. Validate the clone against the preview at: ${previewUrl}`);
+    lines.push("");
+    lines.push(`## Preview`);
+    lines.push(`Validate your work against the live preview: ${previewUrl}`);
   }
-
-  lines.push("");
-  lines.push("## Available tools");
-  lines.push(
-    "workspace_read_file, workspace_write_file, workspace_edit_file, " +
-    "workspace_list_directory, workspace_create_directory, workspace_delete_file, " +
-    "workspace_move_file, workspace_get_file_info, workspace_search_files"
-  );
 
   return lines.join("\n");
 }

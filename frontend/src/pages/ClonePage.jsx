@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "@/App.css";
 import { api, createApiClient } from "@/lib/api";
@@ -9,6 +9,7 @@ import {
   buildConfigUrl,
   buildClonePrompt,
   buildVscodeMcpConfig,
+  buildMcpServersConfig,
   buildWorkspaceClonePrompt,
 } from "@/lib/mcpHandoff";
 
@@ -51,7 +52,12 @@ export default function ClonePage() {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedVscode, setCopiedVscode] = useState(false);
+  const [copiedMcpServers, setCopiedMcpServers] = useState(false);
   const [copiedWsPrompt, setCopiedWsPrompt] = useState(false);
+
+  // ── job peer status ──
+  const [jobStatus, setJobStatus] = useState(null);
+  const statusPollRef = useRef(null);
 
   // ── derived API client ──
   const remoteApi = useMemo(() => {
@@ -121,6 +127,31 @@ export default function ClonePage() {
     return () => { cancelled = true; };
   }, [selectedJobId, effectiveApi, publicBackendUrl]);
 
+  // ── poll job peer status ──
+  useEffect(() => {
+    if (!selectedJobId) {
+      setJobStatus(null);
+      return;
+    }
+    let active = true;
+    const fetchStatus = async () => {
+      try {
+        const s = await effectiveApi.getJobStatus(selectedJobId);
+        if (active) setJobStatus(s);
+      } catch {
+        if (active) setJobStatus(null);
+      }
+    };
+    fetchStatus();
+    const poll = setInterval(fetchStatus, 5000);
+    statusPollRef.current = poll;
+    return () => {
+      active = false;
+      clearInterval(poll);
+      statusPollRef.current = null;
+    };
+  }, [selectedJobId, effectiveApi]);
+
   // ── derived values ──
   const selectedTarget = useMemo(
     () => targets.find((t) => t.id === selectedJob?.target_client_id) || null,
@@ -158,6 +189,11 @@ export default function ClonePage() {
   const vscodeMcpConfig = useMemo(() => {
     if (!publicBackendUrl) return null;
     return buildVscodeMcpConfig(publicBackendUrl);
+  }, [publicBackendUrl]);
+
+  const mcpServersConfig = useMemo(() => {
+    if (!publicBackendUrl) return null;
+    return buildMcpServersConfig(publicBackendUrl);
   }, [publicBackendUrl]);
 
   const workspaceClonePrompt = useMemo(() => {
@@ -292,6 +328,32 @@ export default function ClonePage() {
                   <p className="helper-text dim">API key: <code>{selectedTarget.api_key}</code></p>
                 </div>
               )}
+
+              {/* Peer status */}
+              <div className="notice" style={{ marginTop: ".5rem", borderLeft: "3px solid var(--accent, #6366f1)", paddingLeft: ".75rem" }}>
+                <p className="helper-text"><strong className="mono">Peer status</strong></p>
+                {jobStatus ? (
+                  <>
+                    <p className="helper-text dim">
+                      Target: <strong>{jobStatus.target_online ? "online" : "offline"}</strong>
+                      {" · "}
+                      Executor: <strong>{jobStatus.executor_online ? "online" : "offline"}</strong>
+                      {" · "}
+                      Matched: <strong>{jobStatus.peer_matched ? "yes" : "no"}</strong>
+                    </p>
+                    {jobStatus.peers?.length > 0 && jobStatus.peers.map((p) => (
+                      <p key={p.client_id} className="helper-text dim" style={{ fontSize: ".76rem" }}>
+                        <code>{p.client_id.slice(0, 12)}…</code> · {p.role} · {p.stale ? "stale" : "active"}
+                      </p>
+                    ))}
+                    {jobStatus.peers?.length === 0 && (
+                      <p className="helper-text dim">No peers have announced this job yet.</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="helper-text dim">Fetching...</p>
+                )}
+              </div>
             </section>
           )}
         </div>
@@ -303,8 +365,8 @@ export default function ClonePage() {
           <section className="card" style={{ borderLeft: "3px solid #6366f1" }}>
             <h2 className="mono sm">Kernal Workspace MCP <span className="pill" style={{ fontSize: ".7rem", verticalAlign: "middle" }}>direct</span></h2>
             <p className="helper-text dim">
-              Add this to the other client's <code>.vscode/mcp.json</code> to connect directly to this workspace via the dev tunnel.
-              No job selection needed — uses the standard MCP Streamable HTTP protocol.
+              Give this config to the remote client/agent. It connects directly to this workspace via MCP Streamable HTTP.
+              The agent should call <code>workspace_status_check</code> first — it will get instructions on how to trust the tunnel if needed.
             </p>
 
             {publicBackendUrl ? (
@@ -317,28 +379,41 @@ export default function ClonePage() {
                 </div>
 
                 <div style={{ marginBottom: ".75rem" }}>
-                  <label className="field-label mono dim">VS Code mcp.json entry</label>
+                  <label className="field-label mono dim">VS Code (.vscode/mcp.json)</label>
                   <pre className="config-json" style={{ fontSize: ".78rem" }}>
                     {JSON.stringify(vscodeMcpConfig, null, 2)}
                   </pre>
                   <button
-                    className="btn"
+                    className="btn-sm"
                     onClick={() => handleCopy(JSON.stringify(vscodeMcpConfig, null, 2), setCopiedVscode)}
                   >
-                    {copiedVscode ? "copied!" : "copy mcp.json config"}
+                    {copiedVscode ? "copied!" : "copy VS Code config"}
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: ".75rem" }}>
+                  <label className="field-label mono dim">Other clients — mcpServers format (Cursor, Windsurf, Claude Desktop)</label>
+                  <pre className="config-json" style={{ fontSize: ".78rem" }}>
+                    {JSON.stringify(mcpServersConfig, null, 2)}
+                  </pre>
+                  <button
+                    className="btn-sm"
+                    onClick={() => handleCopy(JSON.stringify(mcpServersConfig, null, 2), setCopiedMcpServers)}
+                  >
+                    {copiedMcpServers ? "copied!" : "copy mcpServers config"}
                   </button>
                 </div>
 
                 <div>
-                  <label className="field-label mono dim">Clone prompt (workspace tools)</label>
-                  <pre className="config-json" style={{ maxHeight: "260px", whiteSpace: "pre-wrap", fontSize: ".76rem" }}>
+                  <label className="field-label mono dim">Agent prompt (connection setup + tools)</label>
+                  <pre className="config-json" style={{ maxHeight: "320px", whiteSpace: "pre-wrap", fontSize: ".76rem" }}>
                     {workspaceClonePrompt}
                   </pre>
                   <button
                     className="btn"
                     onClick={() => handleCopy(workspaceClonePrompt, setCopiedWsPrompt)}
                   >
-                    {copiedWsPrompt ? "copied!" : "copy workspace clone prompt"}
+                    {copiedWsPrompt ? "copied!" : "copy agent prompt"}
                   </button>
                 </div>
               </>

@@ -6,6 +6,32 @@ import { copyText, formatDate, buildExecutorPrompt } from "@/lib/mcpHandoff";
 
 const DEFAULT_SERVER_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
 
+const STATUS_LABELS = {
+  waiting: { text: "waiting for executor", color: "var(--muted)" },
+  wrong_job: { text: "executor online — wrong job", color: "var(--warning, orange)" },
+  matched: { text: "peer matched", color: "var(--success, #22c55e)" },
+  stale: { text: "peer stale", color: "var(--warning, orange)" },
+  offline: { text: "backend unreachable", color: "var(--danger, #ef4444)" },
+};
+
+function deriveStatusLabel(status) {
+  if (!status) return STATUS_LABELS.offline;
+  if (status.peer_matched) return STATUS_LABELS.matched;
+  if (status.executor_online && !status.peer_matched) return STATUS_LABELS.wrong_job;
+  if (status.target_online && !status.executor_online) return STATUS_LABELS.waiting;
+  if (status.peers?.length > 0 && status.peers.every((p) => p.stale)) return STATUS_LABELS.stale;
+  return STATUS_LABELS.waiting;
+}
+
+function PeerStatusBadge({ status }) {
+  const label = deriveStatusLabel(status);
+  return (
+    <span className="pill" style={{ background: label.color, color: "#fff", fontSize: ".72rem" }}>
+      {label.text}
+    </span>
+  );
+}
+
 function JobCard({ job, onUseJob, onCopyId }) {
   return (
     <article className="job-card">
@@ -54,6 +80,10 @@ export default function ConsolePage() {
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [showTunnelLogs, setShowTunnelLogs] = useState(false);
   const tunnelPollRef = useRef(null);
+
+  // Job peer status
+  const [jobStatus, setJobStatus] = useState(null);
+  const statusPollRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +172,32 @@ export default function ConsolePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tunnel.status]);
+
+  // Poll job peer status when a job is loaded
+  useEffect(() => {
+    const jobId = createdJob?.id;
+    if (!jobId) {
+      setJobStatus(null);
+      return;
+    }
+    let active = true;
+    const fetchStatus = async () => {
+      try {
+        const s = await api.getJobStatus(jobId);
+        if (active) setJobStatus(s);
+      } catch {
+        if (active) setJobStatus(null);
+      }
+    };
+    fetchStatus();
+    const poll = setInterval(fetchStatus, 5000);
+    statusPollRef.current = poll;
+    return () => {
+      active = false;
+      clearInterval(poll);
+      statusPollRef.current = null;
+    };
+  }, [createdJob?.id]);
 
   const handleTunnelStart = async () => {
     setTunnelBusy(true);
@@ -542,6 +598,47 @@ export default function ConsolePage() {
               Need the raw operations screen too? Jump back to <Link to="/ops" className="page-link">the ops dashboard</Link>.
             </p>
           </section>
+
+          {/* Job peer status */}
+          {createdJob && (
+            <section className="card" style={{ borderLeft: "3px solid var(--accent, #6366f1)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: ".5rem" }}>
+                <h2 className="mono sm">5. Peer status</h2>
+                <PeerStatusBadge status={jobStatus} />
+              </div>
+              <p className="helper-text dim">
+                Live peer status for job <code>{createdJob.id}</code>.
+                Polls every 5 s.
+              </p>
+              {jobStatus ? (
+                <div className="notice" style={{ marginTop: ".5rem" }}>
+                  <p className="helper-text">
+                    Target online: <strong>{jobStatus.target_online ? "yes" : "no"}</strong>
+                    {" · "}
+                    Executor online: <strong>{jobStatus.executor_online ? "yes" : "no"}</strong>
+                    {" · "}
+                    Matched: <strong>{jobStatus.peer_matched ? "yes" : "no"}</strong>
+                  </p>
+                  {jobStatus.peers?.length > 0 && (
+                    <div style={{ marginTop: ".35rem" }}>
+                      <p className="helper-text dim" style={{ marginBottom: ".25rem" }}>Connected peers:</p>
+                      {jobStatus.peers.map((p) => (
+                        <p key={p.client_id} className="helper-text dim" style={{ fontSize: ".76rem" }}>
+                          <code>{p.client_id.slice(0, 12)}…</code> · {p.role} · {p.stale ? "stale" : "active"}
+                          {p.last_seen && ` · ${new Date(p.last_seen).toLocaleTimeString()}`}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {jobStatus.peers?.length === 0 && (
+                    <p className="helper-text dim" style={{ marginTop: ".25rem" }}>No peers have announced this job yet.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="helper-text dim" style={{ marginTop: ".25rem" }}>Fetching status...</p>
+              )}
+            </section>
+          )}
         </div>
       </div>
 

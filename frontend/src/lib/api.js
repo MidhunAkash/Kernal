@@ -17,6 +17,7 @@ export function createApiClient(baseUrl) {
     },
     listJobs: () => axios.get(`${base}/jobs`).then((r) => r.data),
     getJob: (id) => axios.get(`${base}/jobs/${id}`).then((r) => r.data),
+    getJobStatus: (id) => axios.get(`${base}/jobs/${id}/status`).then((r) => r.data),
     workspaceList: (path = ".") => axios.get(`${base}/workspace/list`, { params: { path } }).then((r) => r.data),
   };
 }
@@ -72,6 +73,7 @@ export const api = {
   createJob: (payload) => axios.post(`${API}/jobs`, payload).then((r) => r.data),
   listJobs: () => axios.get(`${API}/jobs`).then((r) => r.data),
   getJob: (id) => axios.get(`${API}/jobs/${id}`).then((r) => r.data),
+  getJobStatus: (id) => axios.get(`${API}/jobs/${id}/status`).then((r) => r.data),
 
   // Tunnel lifecycle
   tunnelStart: (local_url) => axios.post(`${API}/tunnel/start`, { local_url }).then((r) => r.data),

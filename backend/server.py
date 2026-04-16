@@ -160,6 +160,9 @@ class MCPRegisteredClient(BaseModel):
 
 class MCPHeartbeatRequest(BaseModel):
     client_id: Optional[str] = None
+    job_id: Optional[str] = None
+    role: Optional[str] = None
+    session_id: Optional[str] = None
 
 class MCPJob(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -625,6 +628,10 @@ async def list_events(session_id: Optional[str] = None, limit: int = 50):
 
 # In-memory heartbeat tracker: api_key -> last_seen_ts
 _heartbeats: Dict[str, str] = {}
+
+# In-memory peer presence registry: keyed by (session_id, job_id)
+# Each entry: { client_id: { role, job_id, session_id, last_seen } }
+_peer_registry: Dict[str, Dict[str, Dict[str, Any]]] = {}
 BACKEND_URL = os.environ.get("APP_URL", "http://localhost:8001")
 
 
@@ -949,17 +956,109 @@ async def get_job(job_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/jobs/{job_id}/status")
+async def get_job_status(job_id: str):
+    """Authoritative job peer-status endpoint.
+
+    Resolves the job to its session_id, inspects the peer presence registries
+    (both realtime_handler and in-memory heartbeat registry), and returns
+    a compact status payload."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    try:
+        result = supabase.table("mcp_jobs").select("*").eq("id", job_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Job not found")
+        row = result.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    session_id = row.get("session_id", "")
+    job_status = row.get("status", "open")
+
+    # 1. Check realtime_handler presence (primary source)
+    rt_status = realtime_handler.get_job_peers(session_id, job_id)
+
+    # 2. Check in-memory peer_registry (heartbeat-based)
+    registry_key = f"{session_id}:{job_id}"
+    hb_peers = _peer_registry.get(registry_key, {})
+    now = datetime.now(timezone.utc)
+
+    # Merge heartbeat peers that aren't already in realtime presence
+    all_peers = list(rt_status["peers"])
+    seen_cids = {p["client_id"] for p in all_peers}
+    for cid, info in hb_peers.items():
+        if cid in seen_cids:
+            continue
+        last_seen_str = info.get("last_seen", "")
+        stale = True
+        if last_seen_str:
+            try:
+                last_seen_dt = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+                if last_seen_dt.tzinfo is None:
+                    last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                stale = (now - last_seen_dt).total_seconds() > 60
+            except (ValueError, TypeError):
+                stale = True
+        role = info.get("role", "unknown")
+        if role == "target" and not stale:
+            rt_status["target_online"] = True
+        elif role == "executor" and not stale:
+            rt_status["executor_online"] = True
+        all_peers.append({
+            "client_id": cid,
+            "role": role,
+            "job_id": job_id,
+            "last_seen": last_seen_str,
+            "stale": stale,
+        })
+
+    peer_matched = rt_status["target_online"] and rt_status["executor_online"]
+    matched_client_ids = [
+        p["client_id"] for p in all_peers
+        if not p.get("stale", True)
+    ]
+
+    return {
+        "job_id": job_id,
+        "session_id": session_id,
+        "job_status": job_status,
+        "target_online": rt_status["target_online"],
+        "executor_online": rt_status["executor_online"],
+        "peer_matched": peer_matched,
+        "matched_client_ids": matched_client_ids,
+        "peers": all_peers,
+    }
+
+
 @api_router.post("/mcp/heartbeat")
 async def mcp_heartbeat(
     body: MCPHeartbeatRequest = MCPHeartbeatRequest(),
     x_api_key: Optional[str] = Header(None),
 ):
-    """Heartbeat endpoint — clients ping this to report they're alive."""
+    """Heartbeat endpoint — clients ping this to report they're alive.
+    When job_id + session_id are provided, updates the peer presence registry."""
     key = x_api_key or ""
     ts = datetime.now(timezone.utc).isoformat()
     _heartbeats[key] = ts
     if body.client_id:
         _heartbeats[body.client_id] = ts
+
+    # Update peer presence registry when job-aware fields are provided
+    if body.session_id and body.job_id and body.client_id:
+        registry_key = f"{body.session_id}:{body.job_id}"
+        if registry_key not in _peer_registry:
+            _peer_registry[registry_key] = {}
+        _peer_registry[registry_key][body.client_id] = {
+            "role": body.role or "unknown",
+            "job_id": body.job_id,
+            "session_id": body.session_id,
+            "last_seen": ts,
+        }
+
     return {"status": "ok", "ts": ts}
 
 
