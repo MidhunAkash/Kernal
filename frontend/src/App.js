@@ -73,109 +73,118 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h3 className="text-center text-sm font-semibold text-gray-500 mb-8 tracking-wider">WORKS WITH</h3>
           <div className="flex justify-center items-center gap-16 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">L</span>
-              </div>
-              <span className="text-2xl font-bold">Lovable</span>
+            <div className="flex items-center justify-center">
+              <img 
+                src="https://lovable.dev/img/logo/lovable-logo-bg-dark.png" 
+                alt="Lovable" 
+                className="h-12 w-auto object-contain"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">E</span>
-              </div>
-              <span className="text-2xl font-bold">Emergent</span>
+            <div className="flex items-center justify-center">
+              <img 
+                src="https://assets.emergent.sh/assets/Landing-Hero-E.gif" 
+                alt="Emergent" 
+                className="h-12 w-auto object-contain"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">C</span>
-              </div>
-              <span className="text-2xl font-bold">Cursor</span>
+            <div className="flex items-center justify-center">
+              <img 
+                src="https://ptht05hbb1ssoooe.public.blob.vercel-storage.com/assets/brand/brand-logo-1.svg" 
+                alt="Cursor" 
+                className="h-12 w-auto object-contain"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Three Steps Section - Vertical with Illustration */}
+      {/* Three Steps Section - Alternating Layout */}
       <section className="bg-gray-50 py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-center mb-20">
             Three steps to resolution.
           </h2>
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            {/* Steps - Vertical */}
-            <div className="space-y-8">
-              {/* Step 1 */}
-              <div className="relative group" data-testid="step-ai-hit-wall">
-                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                  <div className="flex items-start gap-6">
-                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold mb-3">AI Hit a Wall</h3>
-                      <p className="text-gray-600 leading-relaxed">
-                        Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
-                      </p>
-                    </div>
+          
+          {/* Step 1 - Left */}
+          <div className="grid md:grid-cols-2 gap-12 items-center mb-16" data-testid="step-ai-hit-wall">
+            <div className="order-2 md:order-1">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl">
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                    1
                   </div>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="relative group" data-testid="step-escalate">
-                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                  <div className="flex items-start gap-6">
-                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold mb-3">Escalate Instantly</h3>
-                      <p className="text-gray-600 leading-relaxed">
-                        With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="relative group" data-testid="step-problem-solved">
-                <div className="bg-white p-8 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl relative">
-                  <div className="flex items-start gap-6">
-                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold mb-3">Problem Solved</h3>
-                      <p className="text-gray-600 leading-relaxed">
-                        A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="text-3xl font-bold mb-4">AI Hit a Wall</h3>
+                    <p className="text-gray-600 leading-relaxed text-lg">
+                      Your AI agent encounters a task it can't handle—maybe it's ambiguous, requires human judgment, or just too complex.
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
+            <div className="order-1 md:order-2">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+                <img 
+                  src="https://images.unsplash.com/photo-1686386084459-8d9d14400a4b?w=800&q=80" 
+                  alt="AI encountering a problem" 
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+            </div>
+          </div>
 
-            {/* Illustration */}
-            <div className="bg-white p-12 border-2 border-gray-200 rounded-lg flex items-center justify-center min-h-[500px]">
-              <div className="text-center space-y-6">
-                <div className="relative">
-                  {/* AI Icon */}
-                  <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-4">
-                    <span className="text-4xl">🤖</span>
+          {/* Step 2 - Right */}
+          <div className="grid md:grid-cols-2 gap-12 items-center mb-16" data-testid="step-escalate">
+            <div className="order-1">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+                <img 
+                  src="https://images.unsplash.com/photo-1642132652859-3ef5a1048fd1?w=800&q=80" 
+                  alt="Human collaboration and help" 
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+            </div>
+            <div className="order-2">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl">
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                    2
                   </div>
-                  <div className="text-4xl mb-4">↓</div>
-                  {/* Human Icon */}
-                  <div className="w-24 h-24 bg-black rounded-full mx-auto flex items-center justify-center mb-4">
-                    <span className="text-4xl">👤</span>
-                  </div>
-                  <div className="text-4xl mb-4">↓</div>
-                  {/* Success Icon */}
-                  <div className="w-24 h-24 bg-green-500 rounded-full mx-auto flex items-center justify-center">
-                    <span className="text-4xl">✓</span>
+                  <div>
+                    <h3 className="text-3xl font-bold mb-4">Escalate Instantly</h3>
+                    <p className="text-gray-600 leading-relaxed text-lg">
+                      With one API call (or SDK method), the task gets posted as a bounty. Skilled humans see it and jump in to help.
+                    </p>
                   </div>
                 </div>
-                <p className="text-gray-600 font-medium">AI → Human → Solution</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3 - Left */}
+          <div className="grid md:grid-cols-2 gap-12 items-center" data-testid="step-problem-solved">
+            <div className="order-2 md:order-1">
+              <div className="bg-white p-10 border-2 border-gray-200 hover:border-black transition-all duration-300 hover:shadow-xl">
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-2xl font-black flex-shrink-0">
+                    3
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-bold mb-4">Problem Solved</h3>
+                    <p className="text-gray-600 leading-relaxed text-lg">
+                      A solver delivers the answer. Your agent receives the solution via webhook or polling—and your user never knows there was a hiccup.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 md:order-2">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+                <img 
+                  src="https://images.unsplash.com/photo-1758691737492-48e8fdd336f7?w=800&q=80" 
+                  alt="Success and problem solved" 
+                  className="w-full h-80 object-cover"
+                />
               </div>
             </div>
           </div>
