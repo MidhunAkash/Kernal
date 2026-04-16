@@ -244,6 +244,34 @@ class HostClient:
             "accept": "application/json",
         })
 
+    def self_check(self) -> bool:
+        """Block until the first heartbeat succeeds, or print a loud error and exit."""
+        url = f"{self.host}/api/jobs/{self.job_id}/agent/heartbeat"
+        print(f"[agent] probing host → POST {url}")
+        try:
+            r = self.session.post(url, json={"client_id": self.client_id}, timeout=20)
+        except requests.RequestException as exc:
+            print("[agent] ✗ cannot reach host:")
+            print(f"[agent]   {type(exc).__name__}: {exc}")
+            print("[agent]   Check: (a) your internet, (b) --host value, (c) any corporate proxy/firewall.")
+            return False
+        body_preview = r.text[:300]
+        if r.status_code == 200:
+            print(f"[agent] ✓ host reachable — heartbeat accepted (HTTP 200)")
+            try:
+                st = r.json().get("status", {})
+                print(f"[agent]   server says target_online={st.get('target_online')}, session_id={st.get('session_id','?')[:8]}")
+            except Exception:
+                pass
+            return True
+        print(f"[agent] ✗ heartbeat rejected: HTTP {r.status_code}")
+        print(f"[agent]   body: {body_preview}")
+        if r.status_code == 401:
+            print("[agent]   → the --api-key does not match this --job-id. Copy the command from /target again.")
+        elif r.status_code == 404:
+            print("[agent]   → the --job-id is unknown. Did you paste it completely? Was the job closed?")
+        return False
+
     def heartbeat(self, tunnel_url: str = "", local_port: int = 0) -> None:
         url = f"{self.host}/api/jobs/{self.job_id}/agent/heartbeat"
         body = {"client_id": self.client_id}
@@ -321,11 +349,18 @@ def main() -> int:
     print(f"[agent] workspace = {workspace}")
     print(f"[agent] host      = {args.host}")
     print(f"[agent] job_id    = {args.job_id}")
+    print(f"[agent] api_key   = {args.api_key[:12]}…{args.api_key[-4:]}")
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
     client = HostClient(args.host, args.job_id, args.api_key)
+
+    # Probe the host FIRST — fail loudly if we can't talk to it.
+    if not client.self_check():
+        print("[agent] aborting — could not establish first heartbeat. See message above.")
+        return 1
+
     state: Dict[str, Any] = {"tunnel_url": args.tunnel_url, "local_port": args.local_port}
 
     cloudflared_proc: Optional[subprocess.Popen] = None
@@ -338,10 +373,15 @@ def main() -> int:
     hb = threading.Thread(target=heartbeat_thread, args=(client, state), daemon=True)
     hb.start()
 
-    # Initial registration heartbeat
-    client.heartbeat(tunnel_url=state["tunnel_url"], local_port=state["local_port"])
+    # Initial registration heartbeat (with tunnel_url if user supplied one)
+    if state["tunnel_url"] or state["local_port"]:
+        client.heartbeat(tunnel_url=state["tunnel_url"], local_port=state["local_port"])
 
-    print("[agent] Ready — long-polling for tool-requests (Ctrl-C to stop)")
+    print("=" * 60)
+    print(f"[agent] ✓ CONNECTED — job {args.job_id[:8]}… is live on the host")
+    print(f"[agent]   dashboard: {args.host}/executor?job={args.job_id}&key={args.api_key}")
+    print("[agent]   long-polling for tool-requests (Ctrl-C to stop)")
+    print("=" * 60)
 
     try:
         while not _stop.is_set():

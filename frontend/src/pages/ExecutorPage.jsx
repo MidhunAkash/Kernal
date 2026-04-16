@@ -108,6 +108,24 @@ export default function ExecutorPage() {
 
       {pub.context && <p className="dim" style={{ lineHeight: 1.5 }}>{pub.context}</p>}
 
+      {!targetOnline && (
+        <div className="card" style={{ borderColor: "#f59e0b" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+            <strong style={{ fontSize: ".9rem" }}>Target is offline</strong>
+          </div>
+          <p className="dim" style={{ fontSize: ".82rem", lineHeight: 1.55 }}>
+            The host has not received a heartbeat from the target's CLI agent.
+            Ask the target to:
+          </p>
+          <ol className="dim" style={{ fontSize: ".82rem", lineHeight: 1.7, paddingLeft: "1.1rem" }}>
+            <li>Confirm the <code>python3 kernal_agent.py …</code> process is actually running (terminal should show <code>✓ CONNECTED — job …</code>).</li>
+            <li>If the terminal shows <code>✗ heartbeat rejected</code> or <code>✗ cannot reach host</code>, fix the cause printed there.</li>
+            <li>Re-copy the command from the target page — a broken paste is the #1 cause.</li>
+          </ol>
+        </div>
+      )}
+
       <div className="grid" style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1fr 1fr" }}>
         <section className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
