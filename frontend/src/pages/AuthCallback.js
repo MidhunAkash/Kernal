@@ -9,8 +9,8 @@ function AuthCallback() {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        // User is authenticated, redirect to onboarding
-        navigate('/onboarding');
+        // User is authenticated, redirect to chat
+        navigate('/chat');
       } else {
         // No user, redirect to login
         navigate('/login');

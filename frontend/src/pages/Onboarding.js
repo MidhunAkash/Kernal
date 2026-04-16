@@ -68,8 +68,8 @@ function Onboarding() {
 
       if (error) throw error;
 
-      // Redirect to home page after successful save
-      navigate('/');
+      // Redirect to chat page after successful save
+      navigate('/chat');
     } catch (error) {
       console.error('Error updating profile:', error);
       alert('Failed to save profile. Please try again.');
@@ -79,7 +79,7 @@ function Onboarding() {
   };
 
   const handleSkip = () => {
-    navigate('/');
+    navigate('/chat');
   };
 
   const handleLogout = async () => {
