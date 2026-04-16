@@ -3,6 +3,28 @@ import "@/App.css";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
+/* ── clipboard helper with fallback ── */
+function copyText(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  }
+  return fallbackCopy(text);
+}
+
+function fallbackCopy(text) {
+  return new Promise((resolve) => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch {}
+    document.body.removeChild(ta);
+    resolve();
+  });
+}
+
 /* ================================================================
    Tabs: Dashboard | Connections | Console | Events
    ================================================================ */
@@ -200,9 +222,10 @@ function ConnectionsTab() {
   };
 
   const copyConfig = (config) => {
-    navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyText(JSON.stringify(config, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
@@ -338,9 +361,10 @@ function ClientCard({ client, onDelete, onCopy }) {
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
-    onCopy(client.config);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyText(JSON.stringify(client.config, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
