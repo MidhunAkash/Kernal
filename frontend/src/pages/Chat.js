@@ -87,7 +87,9 @@ function Chat() {
     fetchMessages();
 
     const pairKey = generatePairKey(user.id, selectedUser.id);
-    const subscription = supabase
+    
+    // Subscribe to real-time changes
+    const channel = supabase
       .channel(`messages:${pairKey}`)
       .on(
         'postgres_changes',
@@ -98,13 +100,21 @@ function Chat() {
           filter: `pair_key=eq.${pairKey}`
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new]);
+          // Only add if it's not already in the messages (avoid duplicates)
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === payload.new.id);
+            if (exists) return prev;
+            return [...prev, payload.new];
+          });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
 
     return () => {
-      subscription.unsubscribe();
+      console.log('Unsubscribing from channel:', pairKey);
+      supabase.removeChannel(channel);
     };
   }, [selectedUser, user, generatePairKey]);
 
@@ -155,21 +165,42 @@ function Chat() {
     setSending(true);
     try {
       const pairKey = generatePairKey(user.id, selectedUser.id);
-      const { error } = await supabase
+      
+      // Create the message object
+      const messageData = {
+        sender_id: user.id,
+        receiver_id: selectedUser.id,
+        body: newMessage.trim(),
+        pair_key: pairKey,
+        created_at: new Date().toISOString()
+      };
+
+      // Optimistically add message to UI immediately
+      const tempMessage = {
+        ...messageData,
+        id: Date.now() // Temporary ID
+      };
+      setMessages(prev => [...prev, tempMessage]);
+      setNewMessage('');
+
+      // Send to database
+      const { data, error } = await supabase
         .from('direct_messages')
-        .insert([
-          {
-            sender_id: user.id,
-            receiver_id: selectedUser.id,
-            body: newMessage.trim(),
-            pair_key: pairKey
-          }
-        ]);
+        .insert([messageData])
+        .select()
+        .single();
 
       if (error) throw error;
-      setNewMessage('');
+
+      // Replace temporary message with real one from database
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempMessage.id ? data : msg
+      ));
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove the temporary message on error
+      setMessages(prev => prev.filter(msg => msg.id !== Date.now()));
+      setNewMessage(newMessage); // Restore the message text
       alert('Failed to send message');
     } finally {
       setSending(false);
