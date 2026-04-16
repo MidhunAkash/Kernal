@@ -71,6 +71,7 @@ function Chat() {
     const fetchMessages = async () => {
       try {
         const pairKey = generatePairKey(user.id, selectedUser.id);
+        console.log('Fetching messages for pair_key:', pairKey);
         const { data, error } = await supabase
           .from('direct_messages')
           .select('*')
@@ -78,6 +79,7 @@ function Chat() {
           .order('created_at', { ascending: true });
 
         if (error) throw error;
+        console.log('Fetched messages:', data?.length);
         setMessages(data || []);
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -87,10 +89,15 @@ function Chat() {
     fetchMessages();
 
     const pairKey = generatePairKey(user.id, selectedUser.id);
+    console.log('Setting up realtime subscription for:', pairKey);
     
     // Subscribe to real-time changes
     const channel = supabase
-      .channel(`messages:${pairKey}`)
+      .channel(`room:${pairKey}`, {
+        config: {
+          broadcast: { self: true },
+        },
+      })
       .on(
         'postgres_changes',
         {
@@ -100,20 +107,26 @@ function Chat() {
           filter: `pair_key=eq.${pairKey}`
         },
         (payload) => {
+          console.log('📨 New message received via realtime:', payload.new);
           // Only add if it's not already in the messages (avoid duplicates)
           setMessages(prev => {
             const exists = prev.some(msg => msg.id === payload.new.id);
-            if (exists) return prev;
+            if (exists) {
+              console.log('Message already exists, skipping');
+              return prev;
+            }
+            console.log('Adding new message to UI');
             return [...prev, payload.new];
           });
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
+      .subscribe((status, err) => {
+        console.log('🔔 Realtime subscription status:', status);
+        if (err) console.error('Subscription error:', err);
       });
 
     return () => {
-      console.log('Unsubscribing from channel:', pairKey);
+      console.log('🔌 Unsubscribing from channel:', pairKey);
       supabase.removeChannel(channel);
     };
   }, [selectedUser, user, generatePairKey]);
@@ -163,14 +176,17 @@ function Chat() {
     if (!newMessage.trim() || !selectedUser) return;
 
     setSending(true);
+    const messageText = newMessage.trim();
+    const pairKey = generatePairKey(user.id, selectedUser.id);
+    
+    console.log('📤 Sending message:', messageText, 'with pair_key:', pairKey);
+
     try {
-      const pairKey = generatePairKey(user.id, selectedUser.id);
-      
       // Create the message object
       const messageData = {
         sender_id: user.id,
         receiver_id: selectedUser.id,
-        body: newMessage.trim(),
+        body: messageText,
         pair_key: pairKey,
         created_at: new Date().toISOString()
       };
@@ -178,12 +194,15 @@ function Chat() {
       // Optimistically add message to UI immediately
       const tempMessage = {
         ...messageData,
-        id: Date.now() // Temporary ID
+        id: `temp-${Date.now()}` // Temporary ID
       };
+      
+      console.log('Adding message optimistically to UI');
       setMessages(prev => [...prev, tempMessage]);
       setNewMessage('');
 
       // Send to database
+      console.log('Inserting to database...');
       const { data, error } = await supabase
         .from('direct_messages')
         .insert([messageData])
@@ -192,16 +211,18 @@ function Chat() {
 
       if (error) throw error;
 
+      console.log('✅ Message inserted successfully:', data);
+
       // Replace temporary message with real one from database
       setMessages(prev => prev.map(msg => 
         msg.id === tempMessage.id ? data : msg
       ));
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       // Remove the temporary message on error
-      setMessages(prev => prev.filter(msg => msg.id !== Date.now()));
-      setNewMessage(newMessage); // Restore the message text
-      alert('Failed to send message');
+      setMessages(prev => prev.filter(msg => !msg.id.toString().startsWith('temp-')));
+      setNewMessage(messageText); // Restore the message text
+      alert('Failed to send message: ' + error.message);
     } finally {
       setSending(false);
     }
