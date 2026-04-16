@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import Card from "./Card";
 import Button from "./Button";
 
+const POSTER_REPLIES = [
+  "Got it, thanks for the update.",
+  "Makes sense. Please keep me posted.",
+  "Sounds good — let me know if you need more context.",
+  "Appreciate the quick response.",
+  "Perfect. Ping me when you have a patch ready.",
+];
+
 const getNowTimestamp = () => {
   const d = new Date();
   let h = d.getHours();
@@ -14,13 +22,45 @@ const getNowTimestamp = () => {
 const ChatUI = ({ messages: initialMessages = [] }) => {
   const [messages, setMessages] = useState(initialMessages);
   const [inputValue, setInputValue] = useState("");
+  const [isPosterTyping, setIsPosterTyping] = useState(false);
   const listRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isPosterTyping]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleAutoReply = () => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    setIsPosterTyping(true);
+    typingTimeoutRef.current = setTimeout(() => {
+      const reply =
+        POSTER_REPLIES[Math.floor(Math.random() * POSTER_REPLIES.length)];
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + Math.random(),
+          sender: "poster",
+          name: "Job Poster",
+          message: reply,
+          timestamp: getNowTimestamp(),
+        },
+      ]);
+      setIsPosterTyping(false);
+    }, 1800);
+  };
 
   const sendMessage = () => {
     const trimmed = inputValue.trim();
@@ -34,6 +74,7 @@ const ChatUI = ({ messages: initialMessages = [] }) => {
     };
     setMessages((prev) => [...prev, newMessage]);
     setInputValue("");
+    scheduleAutoReply();
   };
 
   const handleKeyDown = (e) => {
@@ -62,6 +103,23 @@ const ChatUI = ({ messages: initialMessages = [] }) => {
             </div>
           </div>
         ))}
+        {isPosterTyping && (
+          <div
+            className="chat-typing-row"
+            data-testid="chat-typing-indicator"
+            aria-live="polite"
+          >
+            <div className="chat-meta">
+              <span className="chat-sender">Job Poster</span>
+              <span className="chat-time">typing…</span>
+            </div>
+            <div className="chat-typing-bubble" aria-hidden="true">
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+            </div>
+          </div>
+        )}
       </div>
       <div className="chat-input-row">
         <input
