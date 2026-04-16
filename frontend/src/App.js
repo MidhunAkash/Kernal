@@ -158,11 +158,11 @@ function App() {
               </div>
             </div>
             <div className="order-1 md:order-2">
-              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg flex items-center justify-center p-8">
                 <img 
-                  src="https://images.unsplash.com/photo-1686386084459-8d9d14400a4b?w=800&q=80" 
+                  src="https://customer-assets.emergentagent.com/job_landing-gen-8/artifacts/adbbks3a_software-engineer-makes-bug-concept-coder-search-problem-upset-programmer-work-with-error-screen-with-broken-code-woman-have-failure-development-flat-isolated-illustration-white-background_633472-2162.avif" 
                   alt="AI encountering a problem" 
-                  className="w-full h-80 object-cover"
+                  className="w-full h-auto object-contain max-h-80"
                 />
               </div>
             </div>
@@ -171,11 +171,11 @@ function App() {
           {/* Step 2 - Right */}
           <div className="grid md:grid-cols-2 gap-12 items-center mb-16" data-testid="step-escalate">
             <div className="order-1">
-              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg flex items-center justify-center p-8">
                 <img 
-                  src="https://images.unsplash.com/photo-1642132652859-3ef5a1048fd1?w=800&q=80" 
+                  src="https://customer-assets.emergentagent.com/job_landing-gen-8/artifacts/9lgyabkt_problem-solving-line-filled-free-vector.jpg" 
                   alt="Expert collaboration and help" 
-                  className="w-full h-80 object-cover"
+                  className="w-full h-auto object-contain max-h-80"
                 />
               </div>
             </div>
@@ -214,11 +214,11 @@ function App() {
               </div>
             </div>
             <div className="order-1 md:order-2">
-              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg">
+              <div className="bg-white rounded-lg overflow-hidden border-2 border-gray-200 shadow-lg flex items-center justify-center p-8">
                 <img 
-                  src="https://images.unsplash.com/photo-1758691737492-48e8fdd336f7?w=800&q=80" 
+                  src="https://customer-assets.emergentagent.com/job_landing-gen-8/artifacts/8nfm3gw5_graph-growth-with-arrow-single-continuous-one-line-drawing-business-financial-sales-market-growth-one-stroke-sketch-outline-draw-illustration-vector.jpg" 
                   alt="Success and problem solved" 
-                  className="w-full h-80 object-cover"
+                  className="w-full h-auto object-contain max-h-80"
                 />
               </div>
             </div>
