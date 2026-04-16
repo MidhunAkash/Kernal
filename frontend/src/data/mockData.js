@@ -63,9 +63,9 @@ export const mockMCPConfig = {
   mcpServers: {
     humanMCP: {
       command: "npx",
-      args: ["-y", "@vibecon/human-mcp@latest"],
+      args: ["-y", "@kernel/human-mcp@latest"],
       env: {
-        VIBECON_TOKEN: "${VIBECON_TOKEN}",
+        KERNEL_TOKEN: "${KERNEL_TOKEN}",
       },
     },
   },

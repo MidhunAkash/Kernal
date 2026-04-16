@@ -127,7 +127,7 @@ When user asks any question, only use Human MCP.`;
             <div className="link-body">
               <div className="link-label">Tunnel Link</div>
               <div className="link-url">
-                https://tunnel.vibecon.io/{job.id}
+                https://tunnel.kernel.io/{job.id}
               </div>
             </div>
           </div>
@@ -138,7 +138,7 @@ When user asks any question, only use Human MCP.`;
             <div className="link-body">
               <div className="link-label">Preview URL</div>
               <div className="link-url">
-                https://preview.vibecon.io/{job.id}
+                https://preview.kernel.io/{job.id}
               </div>
             </div>
           </div>
