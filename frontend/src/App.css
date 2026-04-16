@@ -72,6 +72,29 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: .4rem .75rem;
 }
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .4rem .75rem;
+}
+
+/* SQL setup block */
+.warn-card {
+  border-color: #3d3520;
+  background: #12110e;
+}
+.sql-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .72rem;
+  color: var(--accent);
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.5;
+}
 
 /* Status */
 .status-row {

@@ -46,7 +46,7 @@ class MCPTunnelAPITester:
             return False, {}
 
     def test_health_endpoint(self):
-        """Test health endpoint - should return health status with config flags"""
+        """Test health endpoint - should return supabase_connected=true, table_ready=false"""
         success, response = self.run_test(
             "Health Check",
             "GET",
@@ -57,16 +57,28 @@ class MCPTunnelAPITester:
         if success:
             # Verify expected fields in health response
             expected_fields = ['status', 'supabase_connected', 'database_url_set', 
-                             'supabase_url_set', 'supabase_anon_key_set', 'message']
+                             'supabase_url_set', 'supabase_anon_key_set', 'table_ready', 'message']
             for field in expected_fields:
                 if field not in response:
                     print(f"❌ Missing field in health response: {field}")
                     return False
             
-            # Check that supabase_connected is False (expected with placeholder credentials)
-            if response.get('supabase_connected') == True:
-                print(f"❌ Expected supabase_connected to be False with placeholder credentials")
+            # Check that supabase_connected is True (real Supabase credentials)
+            if response.get('supabase_connected') != True:
+                print(f"❌ Expected supabase_connected to be True, got {response.get('supabase_connected')}")
                 return False
+                
+            # Check that table_ready is False (table doesn't exist yet)
+            if response.get('table_ready') != False:
+                print(f"❌ Expected table_ready to be False, got {response.get('table_ready')}")
+                return False
+                
+            # Check that all env flags are True
+            env_flags = ['database_url_set', 'supabase_url_set', 'supabase_anon_key_set']
+            for flag in env_flags:
+                if response.get(flag) != True:
+                    print(f"❌ Expected {flag} to be True, got {response.get(flag)}")
+                    return False
                 
             print(f"✅ Health response contains all expected fields")
             print(f"Status: {response.get('status')}")
@@ -89,25 +101,53 @@ class MCPTunnelAPITester:
         return False
 
     def test_mcp_clients_post(self):
-        """Test POST /api/mcp/clients - should return 503 when DB not available"""
+        """Test POST /api/mcp/clients - should return 500 when table doesn't exist"""
         success, response = self.run_test(
-            "Register MCP Client (Expected 503)",
+            "Register MCP Client (Expected 500)",
             "POST",
             "api/mcp/clients",
-            503,
+            500,
             data={"name": "test-client", "description": "test description"}
         )
         return success
 
     def test_mcp_clients_get(self):
-        """Test GET /api/mcp/clients - should return 503 when DB not available"""
+        """Test GET /api/mcp/clients - should return 500 when table doesn't exist"""
         success, response = self.run_test(
-            "List MCP Clients (Expected 503)",
+            "List MCP Clients (Expected 500)",
             "GET",
             "api/mcp/clients",
-            503
+            500
         )
         return success
+
+    def test_setup_sql_endpoint(self):
+        """Test GET /api/setup-sql - should return SQL instructions"""
+        success, response = self.run_test(
+            "Setup SQL Instructions",
+            "GET",
+            "api/setup-sql",
+            200
+        )
+        
+        if success:
+            # Verify expected fields in setup-sql response
+            expected_fields = ['instruction', 'sql']
+            for field in expected_fields:
+                if field not in response:
+                    print(f"❌ Missing field in setup-sql response: {field}")
+                    return False
+            
+            # Check that SQL contains table creation
+            sql = response.get('sql', '')
+            if 'CREATE TABLE' not in sql or 'mcp_clients' not in sql:
+                print(f"❌ SQL doesn't contain expected table creation")
+                return False
+                
+            print(f"✅ Setup SQL response contains all expected fields")
+            print(f"Instruction: {response.get('instruction')}")
+            return True
+        return False
 
 def main():
     print("🚀 Starting MCP Tunnel API Tests")
@@ -125,7 +165,10 @@ def main():
     # Test root endpoint
     test_results.append(("Root Message", tester.test_root_endpoint()))
     
-    # Test MCP client endpoints (should fail with 503)
+    # Test setup-sql endpoint
+    test_results.append(("Setup SQL Instructions", tester.test_setup_sql_endpoint()))
+    
+    # Test MCP client endpoints (should fail with 500 - table doesn't exist)
     test_results.append(("POST MCP Clients", tester.test_mcp_clients_post()))
     test_results.append(("GET MCP Clients", tester.test_mcp_clients_get()))
 

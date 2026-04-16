@@ -10,6 +10,8 @@ function App() {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [loading, setLoading] = useState(true);
+  const [setupSql, setSetupSql] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -25,13 +27,22 @@ function App() {
       const { data } = await axios.get(`${API}/mcp/clients`);
       setClients(data);
     } catch {
-      /* ignore when DB not ready */
+      /* DB might not be ready */
+    }
+  }, []);
+
+  const fetchSetupSql = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/setup-sql`);
+      setSetupSql(data);
+    } catch {
+      /* ignore */
     }
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchHealth(), fetchClients()]).finally(() => setLoading(false));
-  }, [fetchHealth, fetchClients]);
+    Promise.all([fetchHealth(), fetchClients(), fetchSetupSql()]).finally(() => setLoading(false));
+  }, [fetchHealth, fetchClients, fetchSetupSql]);
 
   const register = async (e) => {
     e.preventDefault();
@@ -50,8 +61,16 @@ function App() {
     try {
       await axios.delete(`${API}/mcp/clients/${id}`);
       fetchClients();
-    } catch (err) {
+    } catch {
       alert("Failed to remove client");
+    }
+  };
+
+  const copySql = () => {
+    if (setupSql?.sql) {
+      navigator.clipboard.writeText(setupSql.sql);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -63,9 +82,10 @@ function App() {
     );
   }
 
+  const needsTable = health?.supabase_connected && !health?.table_ready;
+
   return (
     <div className="shell" data-testid="app-root">
-      {/* Header */}
       <header className="hdr" data-testid="app-header">
         <h1 className="mono">MCP Tunnel</h1>
         <span className="tag">supabase&nbsp;realtime&nbsp;poc</span>
@@ -74,15 +94,28 @@ function App() {
       {/* Health */}
       <section className="card" data-testid="health-section">
         <h2 className="mono sm">Connection Status</h2>
-        <div className="grid2">
+        <div className="grid3">
           <StatusRow label="Backend" ok={!!health} testId="status-backend" />
-          <StatusRow label="Supabase PG" ok={health?.supabase_connected} testId="status-supabase" />
+          <StatusRow label="Supabase" ok={health?.supabase_connected} testId="status-supabase" />
+          <StatusRow label="Table" ok={health?.table_ready} testId="status-table" />
           <StatusRow label="DATABASE_URL" ok={health?.database_url_set} testId="status-db-url" />
           <StatusRow label="SUPABASE_URL" ok={health?.supabase_url_set} testId="status-supa-url" />
           <StatusRow label="ANON_KEY" ok={health?.supabase_anon_key_set} testId="status-anon-key" />
         </div>
         {health?.message && <p className="mono dim mt" data-testid="health-message">{health.message}</p>}
       </section>
+
+      {/* Setup SQL — show if table not ready */}
+      {needsTable && setupSql && (
+        <section className="card warn-card" data-testid="setup-sql-section">
+          <h2 className="mono sm">Setup Required</h2>
+          <p className="dim" style={{ fontSize: '.82rem' }}>Run this SQL in your Supabase Dashboard &gt; SQL Editor:</p>
+          <pre className="sql-block" data-testid="setup-sql">{setupSql.sql}</pre>
+          <button data-testid="btn-copy-sql" className="btn" onClick={copySql}>
+            {copied ? "copied!" : "copy sql"}
+          </button>
+        </section>
+      )}
 
       {/* Register */}
       <section className="card" data-testid="register-section">
@@ -133,9 +166,8 @@ function App() {
         )}
       </section>
 
-      {/* Footer */}
       <footer className="ft mono dim" data-testid="app-footer">
-        <p>MCP Supabase Tunnel POC — Realtime channel ready when credentials are set</p>
+        <p>MCP Supabase Tunnel POC — Realtime channel ready when table is configured</p>
       </footer>
     </div>
   );
