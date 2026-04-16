@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import "@/App.css";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -37,6 +38,9 @@ function App() {
       <header className="hdr" data-testid="app-header">
         <h1 className="mono">MCP Tunnel</h1>
         <span className="tag">supabase&nbsp;realtime</span>
+        <Link to="/" className="btn-sm nav-link" style={{ marginLeft: "auto" }}>
+          ← console
+        </Link>
       </header>
 
       <nav className="tab-bar" data-testid="tab-bar">

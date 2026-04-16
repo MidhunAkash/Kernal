@@ -49,6 +49,17 @@ export const api = {
   workspaceWrite: (path, content) =>
     axios.post(`${API}/workspace/write`, { path, content }).then((r) => r.data),
 
+  // Jobs / console setup
+  createJob: (payload) => axios.post(`${API}/jobs`, payload).then((r) => r.data),
+  listJobs: () => axios.get(`${API}/jobs`).then((r) => r.data),
+  getJob: (id) => axios.get(`${API}/jobs/${id}`).then((r) => r.data),
+
+  // Tunnel lifecycle
+  tunnelStart: (local_url) => axios.post(`${API}/tunnel/start`, { local_url }).then((r) => r.data),
+  tunnelStop: () => axios.post(`${API}/tunnel/stop`).then((r) => r.data),
+  tunnelStatus: () => axios.get(`${API}/tunnel/status`).then((r) => r.data),
+  tunnelLogs: (tail = 80) => axios.get(`${API}/tunnel/logs`, { params: { tail } }).then((r) => r.data),
+
   // Events
   listEvents: (session_id, limit = 50) =>
     axios

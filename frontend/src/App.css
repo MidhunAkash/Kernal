@@ -38,11 +38,16 @@ body {
   min-height: 100vh;
 }
 
+.shell.wide {
+  max-width: 1100px;
+}
+
 /* Header */
 .hdr {
   display: flex;
   align-items: baseline;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 .hdr h1 { font-size: 1.25rem; font-weight: 600; }
 .tag {
@@ -53,6 +58,12 @@ body {
   border-radius: 20px;
   color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
+}
+
+.nav-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Card */
@@ -398,4 +409,133 @@ select.inp {
 /* ---- Client card expand ---- */
 .client-row {
   flex-wrap: wrap;
+}
+
+/* ---- Console page ---- */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 1rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.helper-text {
+  font-size: .75rem;
+  line-height: 1.5;
+}
+
+.textarea-lg {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.step-list {
+  display: grid;
+  gap: .65rem;
+}
+
+.step-row {
+  display: flex;
+  gap: .75rem;
+  align-items: flex-start;
+  padding: .8rem;
+  border-radius: var(--radius);
+  background: rgba(0,0,0,.18);
+  border: 1px solid var(--border);
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59,240,138,.12);
+  color: var(--accent);
+  font-size: .78rem;
+  flex-shrink: 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.summary-card {
+  padding: .8rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.18);
+}
+
+.summary-card strong {
+  display: block;
+  margin-bottom: .35rem;
+}
+
+.notice {
+  padding: .8rem .9rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(59,240,138,.25);
+  background: rgba(59,240,138,.08);
+}
+
+.job-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: .75rem;
+}
+
+.job-card {
+  padding: .9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.16);
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  width: fit-content;
+  border-radius: 999px;
+  padding: .18rem .55rem;
+  background: rgba(85,153,255,.12);
+  color: #5599ff;
+  font-size: .68rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.page-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.page-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 860px) {
+  .hero-grid,
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -17,6 +17,7 @@ from mcp_tools import (
     ensure_workspace, dispatch_tool, TOOL_SCHEMAS, WORKSPACE_ROOT,
 )
 from realtime_handler import realtime_handler
+from tunnel_manager import tunnel_manager
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -123,6 +124,23 @@ class MCPRegisteredClient(BaseModel):
 class MCPHeartbeatRequest(BaseModel):
     client_id: Optional[str] = None
 
+class MCPJob(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    context: str = ""
+    tunnel_url: str
+    target_client_id: str
+    session_id: str
+    status: str = "open"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class MCPJobCreate(BaseModel):
+    title: str
+    context: str = ""
+    tunnel_url: str
+    target_client_id: str
+
 class HealthResponse(BaseModel):
     status: str
     supabase_connected: bool
@@ -187,7 +205,7 @@ async def shutdown():
     logger.info("App shutdown complete")
 
 async def ensure_table():
-    """Create mcp_clients table if it doesn't exist using Supabase SQL."""
+    """Create the core MCP tables if they don't exist using Supabase SQL."""
     global supabase
     if not supabase:
         return
@@ -202,19 +220,51 @@ async def ensure_table():
                     status TEXT DEFAULT 'registered',
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );
+
+                CREATE TABLE IF NOT EXISTS mcp_sessions (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    channel_name TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_by TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS mcp_file_events (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    tool_name TEXT NOT NULL DEFAULT '',
+                    arguments JSONB DEFAULT '{}',
+                    result JSONB DEFAULT '{}',
+                    from_client TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS mcp_jobs (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    context TEXT DEFAULT '',
+                    tunnel_url TEXT NOT NULL,
+                    target_client_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    status TEXT DEFAULT 'open',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
             """
         }).execute()
-        logger.info("mcp_clients table ensured via RPC")
+        logger.info("Core MCP tables ensured via RPC")
     except Exception as e:
         logger.warning(f"RPC exec_sql not available (expected): {e}")
-        logger.info("Table must be created manually or via Supabase dashboard. Trying direct insert to test...")
-        # Table might already exist — we'll find out on first query
-        try:
-            supabase.table('mcp_clients').select('id').limit(1).execute()
-            logger.info("mcp_clients table exists and is accessible")
-        except Exception as e2:
-            logger.warning(f"mcp_clients table not found: {e2}")
-            logger.info("Please create the table via Supabase SQL Editor")
+        logger.info("Tables must be created manually or via Supabase dashboard. Checking direct access...")
+        for table_name in ("mcp_clients", "mcp_sessions", "mcp_file_events", "mcp_jobs"):
+            try:
+                supabase.table(table_name).select('id').limit(1).execute()
+                logger.info(f"{table_name} table exists and is accessible")
+            except Exception as table_error:
+                logger.warning(f"{table_name} table not found: {table_error}")
+        logger.info("If any table is missing, run the SQL from /api/setup-sql in the Supabase SQL Editor")
 
 # ---------- Routes ----------
 
@@ -346,6 +396,21 @@ ALTER TABLE mcp_file_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_mcp_file_events" ON mcp_file_events;
 CREATE POLICY "anon_mcp_file_events" ON mcp_file_events FOR ALL USING (true) WITH CHECK (true);
 
+-- ===================== MCP Jobs =====================
+CREATE TABLE IF NOT EXISTS mcp_jobs (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    context TEXT DEFAULT '',
+    tunnel_url TEXT NOT NULL,
+    target_client_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE mcp_jobs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_mcp_jobs" ON mcp_jobs;
+CREATE POLICY "anon_mcp_jobs" ON mcp_jobs FOR ALL USING (true) WITH CHECK (true);
+
 -- ===================== Realtime Publication =====================
 DO $$
 BEGIN
@@ -360,6 +425,11 @@ END $$;
 DO $$
 BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE mcp_file_events;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE mcp_jobs;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 """
@@ -597,6 +667,52 @@ def _parse_client_meta(description: str) -> dict:
         return {}
 
 
+def _build_console_config(main_server_url: str, api_key: str, job_id: str) -> dict:
+    return {
+        "mainServerUrl": main_server_url,
+        "apiKey": api_key,
+        "jobId": job_id,
+    }
+
+
+def _get_target_client_or_raise(target_client_id: str):
+    result = supabase.table("mcp_clients").select("*").eq("id", target_client_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Target client not found")
+
+    row = result.data[0]
+    meta = _parse_client_meta(row.get("description", ""))
+    if meta.get("role") != "target":
+        raise HTTPException(status_code=400, detail="target_client_id must belong to a target client")
+    if not meta.get("session_id"):
+        raise HTTPException(status_code=400, detail="Target client is missing a session")
+    if not meta.get("api_key"):
+        raise HTTPException(status_code=400, detail="Target client is missing an API key")
+
+    return row, meta
+
+
+def _build_job_payload(job_row: dict, target_row: dict, target_meta: dict, include_config: bool = False) -> dict:
+    payload = {
+        "id": job_row["id"],
+        "title": job_row["title"],
+        "context": job_row.get("context", ""),
+        "tunnel_url": job_row.get("tunnel_url", ""),
+        "target_client_id": job_row.get("target_client_id", ""),
+        "target_name": target_row.get("name", ""),
+        "session_id": job_row.get("session_id", ""),
+        "status": job_row.get("status", "open"),
+        "created_at": job_row.get("created_at", ""),
+    }
+    if include_config:
+        payload["console_config"] = _build_console_config(
+            BACKEND_URL,
+            target_meta.get("api_key", ""),
+            job_row["id"],
+        )
+    return payload
+
+
 @api_router.post("/mcp/add")
 async def add_mcp_client(body: MCPAddClientRequest):
     """Register a new MCP client (target or executor) with auto-generated API key."""
@@ -719,6 +835,98 @@ async def get_client_config(client_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/jobs")
+async def create_job(body: MCPJobCreate):
+    """Create a shareable expert job bound to a target client/session."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    try:
+        target_row, target_meta = _get_target_client_or_raise(body.target_client_id)
+        job = MCPJob(
+            title=body.title,
+            context=body.context,
+            tunnel_url=body.tunnel_url,
+            target_client_id=body.target_client_id,
+            session_id=target_meta["session_id"],
+        )
+
+        supabase.table("mcp_jobs").insert({
+            "id": job.id,
+            "title": job.title,
+            "context": job.context,
+            "tunnel_url": job.tunnel_url,
+            "target_client_id": job.target_client_id,
+            "session_id": job.session_id,
+            "status": job.status,
+            "created_at": job.created_at,
+        }).execute()
+
+        return {
+            "job": _build_job_payload(job.model_dump(), target_row, target_meta, include_config=True),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        detail = str(e)
+        if "mcp_jobs" in detail and ("could not find" in detail.lower() or "does not exist" in detail.lower()):
+            detail = "mcp_jobs table not found. Run the SQL from /api/setup-sql first."
+        raise HTTPException(status_code=500, detail=detail)
+
+
+@api_router.get("/jobs")
+async def list_jobs():
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    try:
+        result = supabase.table("mcp_jobs").select("*").order("created_at", desc=True).execute()
+        jobs = []
+        for row in result.data:
+            try:
+                target_row, target_meta = _get_target_client_or_raise(row.get("target_client_id", ""))
+                jobs.append(_build_job_payload(row, target_row, target_meta, include_config=False))
+            except HTTPException:
+                jobs.append({
+                    "id": row["id"],
+                    "title": row.get("title", ""),
+                    "context": row.get("context", ""),
+                    "tunnel_url": row.get("tunnel_url", ""),
+                    "target_client_id": row.get("target_client_id", ""),
+                    "target_name": "Unknown target",
+                    "session_id": row.get("session_id", ""),
+                    "status": row.get("status", "open"),
+                    "created_at": row.get("created_at", ""),
+                })
+        return {"jobs": jobs, "count": len(jobs)}
+    except Exception as e:
+        detail = str(e)
+        if "mcp_jobs" in detail and ("could not find" in detail.lower() or "does not exist" in detail.lower()):
+            return {"jobs": [], "count": 0, "message": "mcp_jobs table not found yet"}
+        raise HTTPException(status_code=500, detail=detail)
+
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str):
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    try:
+        result = supabase.table("mcp_jobs").select("*").eq("id", job_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        row = result.data[0]
+        target_row, target_meta = _get_target_client_or_raise(row.get("target_client_id", ""))
+        return {
+            "job": _build_job_payload(row, target_row, target_meta, include_config=True),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/mcp/heartbeat")
 async def mcp_heartbeat(
     body: MCPHeartbeatRequest = MCPHeartbeatRequest(),
@@ -794,6 +1002,38 @@ async def delete_mcp_connection(client_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"status": "deleted", "id": client_id}
+
+
+# ---------- Tunnel Lifecycle ----------
+
+class TunnelStartRequest(BaseModel):
+    local_url: str = "http://localhost:8001"
+
+
+@api_router.post("/tunnel/start")
+async def tunnel_start(body: TunnelStartRequest):
+    """Start a cloudflared quick-tunnel pointing at the given local URL."""
+    result = await tunnel_manager.start(body.local_url)
+    return result
+
+
+@api_router.post("/tunnel/stop")
+async def tunnel_stop():
+    """Stop the running tunnel."""
+    result = await tunnel_manager.stop()
+    return result
+
+
+@api_router.get("/tunnel/status")
+async def tunnel_status():
+    """Get the current tunnel status."""
+    return tunnel_manager.get_status()
+
+
+@api_router.get("/tunnel/logs")
+async def tunnel_logs(tail: int = 80):
+    """Get recent tunnel process logs."""
+    return {"logs": tunnel_manager.get_logs(tail)}
 
 
 # ---------- App wiring ----------

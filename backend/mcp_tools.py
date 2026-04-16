@@ -1,11 +1,12 @@
 """MCP File Operation Tools — Sandboxed filesystem CRUD for the MCP tunnel."""
 
+import os
 import shutil
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-WORKSPACE_ROOT = Path("/app/workspace")
+WORKSPACE_ROOT = Path(os.environ.get("WORKSPACE_ROOT", str(Path(__file__).resolve().parent.parent / "workspace")))
 
 
 def ensure_workspace():
