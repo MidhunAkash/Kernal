@@ -112,29 +112,41 @@ function Chat() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
+  // Real-time search as user types
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, email')
-        .neq('id', user.id)
-        .or(`email.ilike.%${searchQuery}%,id.eq.${searchQuery}`)
-        .limit(10);
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, name, email')
+          .neq('id', user.id)
+          .ilike('email', `%${searchQuery}%`)
+          .limit(10);
 
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error('Error searching users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (error) throw error;
+        setSearchResults(data || []);
+      } catch (error) {
+        console.error('Error searching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Debounce search to avoid too many queries
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchUsers();
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, user]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -208,17 +220,22 @@ function Chat() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchUsers()}
-                placeholder="Search by email or ID..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                placeholder="Search users by email..."
+                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
               />
-              <button
-                onClick={searchUsers}
-                disabled={loading}
-                className="absolute right-2 top-2 text-gray-400 hover:text-black"
-              >
-                🔍
-              </button>
+              {loading && (
+                <div className="absolute right-3 top-2.5 text-gray-400">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                </div>
+              )}
+              {!loading && searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-black"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             {searchResults.length > 0 && (
@@ -233,6 +250,12 @@ function Chat() {
                     <div className="text-xs text-gray-500">{result.email}</div>
                   </button>
                 ))}
+              </div>
+            )}
+
+            {searchQuery && searchResults.length === 0 && !loading && (
+              <div className="mt-2 text-sm text-gray-500 text-center py-2">
+                No users found
               </div>
             )}
           </div>
