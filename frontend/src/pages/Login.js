@@ -7,6 +7,9 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
@@ -22,6 +25,8 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setShowResendVerification(false);
+    setResendSuccess(false);
     setLoading(true);
 
     const result = await login(email, password);
@@ -31,6 +36,34 @@ function Login() {
       navigate('/onboarding');
     } else {
       setError(result.error);
+      // Check if error is about email not confirmed
+      if (result.error.toLowerCase().includes('email not confirmed') || 
+          result.error.toLowerCase().includes('email confirmation')) {
+        setShowResendVerification(true);
+      }
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    setResendSuccess(false);
+    setError('');
+
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) throw error;
+
+      setResendSuccess(true);
+      setError('');
+    } catch (error) {
+      setError(error.message || 'Failed to resend verification email');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -55,7 +88,25 @@ function Login() {
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded" data-testid="error-message">
-              {error}
+              <p>{error}</p>
+              {showResendVerification && (
+                <div className="mt-3">
+                  <button
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="text-sm font-medium text-red-900 underline hover:no-underline disabled:opacity-50"
+                    data-testid="resend-verification-btn"
+                  >
+                    {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {resendSuccess && (
+            <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded" data-testid="success-message">
+              ✓ Verification email sent! Please check your inbox and click the link to verify your account.
             </div>
           )}
 

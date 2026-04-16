@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 function Register() {
@@ -8,8 +8,9 @@ function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showEmailMessage, setShowEmailMessage] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const { register, loginWithGoogle } = useAuth();
-  const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -33,7 +34,9 @@ function Register() {
     setLoading(false);
 
     if (result.success) {
-      navigate('/onboarding');
+      // Show email verification message instead of navigating immediately
+      setRegisteredEmail(email);
+      setShowEmailMessage(true);
     } else {
       setError(result.error);
     }
@@ -58,11 +61,47 @@ function Register() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded" data-testid="error-message">
-              {error}
+          {showEmailMessage ? (
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Check your email!</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                We've sent a verification link to <span className="font-medium">{registeredEmail}</span>
+              </p>
+              <p className="text-sm text-gray-600 mb-6">
+                Click the link in the email to verify your account and complete registration.
+              </p>
+              <div className="space-y-3">
+                <Link
+                  to="/login"
+                  className="block w-full bg-black text-white px-4 py-3 rounded font-medium hover:bg-gray-800"
+                >
+                  Go to Login
+                </Link>
+                <button
+                  onClick={() => {
+                    setShowEmailMessage(false);
+                    setName('');
+                    setEmail('');
+                    setPassword('');
+                  }}
+                  className="block w-full border border-gray-300 text-gray-700 px-4 py-3 rounded font-medium hover:bg-gray-50"
+                >
+                  Register Another Account
+                </button>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {error && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded" data-testid="error-message">
+                  {error}
+                </div>
+              )}
 
           <form onSubmit={handleSubmit} className="space-y-6" data-testid="register-form">
             <div>
@@ -180,6 +219,8 @@ function Register() {
               ← Back to home
             </Link>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
