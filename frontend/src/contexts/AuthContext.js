@@ -80,23 +80,6 @@ export function AuthProvider({ children}) {
     }
   };
 
-  const loginWithGithub = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-
-      return { success: true, data };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
   const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -109,7 +92,7 @@ export function AuthProvider({ children}) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, register, login, loginWithGoogle, loginWithGithub, logout }}>
+    <AuthContext.Provider value={{ user, session, loading, register, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
