@@ -2,13 +2,20 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
+import json
+import asyncio
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 from supabase import create_client, Client
+
+from mcp_tools import (
+    ensure_workspace, dispatch_tool, TOOL_SCHEMAS, WORKSPACE_ROOT,
+)
+from realtime_handler import realtime_handler
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -44,6 +51,57 @@ class MCPClientCreate(BaseModel):
     name: str
     description: str = ""
 
+# --- Session models ---
+
+class MCPSession(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    channel_name: str = ""
+    status: str = "active"
+    created_by: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class MCPSessionCreate(BaseModel):
+    name: str
+    created_by: str = ""
+
+# --- File event models ---
+
+class MCPFileEvent(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    event_type: str
+    tool_name: str
+    arguments: Dict[str, Any] = {}
+    result: Dict[str, Any] = {}
+    from_client: str = ""
+    status: str = "pending"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# --- Workspace tool models ---
+
+class WriteFileRequest(BaseModel):
+    path: str
+    content: str
+
+class EditFileRequest(BaseModel):
+    path: str
+    old_text: str
+    new_text: str
+
+class CreateDirRequest(BaseModel):
+    path: str
+
+class MoveFileRequest(BaseModel):
+    source: str
+    destination: str
+
+class ToolCallRequest(BaseModel):
+    tool: str
+    arguments: Dict[str, Any] = {}
+
 class HealthResponse(BaseModel):
     status: str
     supabase_connected: bool
@@ -55,19 +113,57 @@ class HealthResponse(BaseModel):
 
 # ---------- Lifecycle ----------
 
+async def _log_event_to_db(session_id: str, event_type: str, data: dict):
+    """Persist an event row to mcp_file_events (best-effort)."""
+    if not supabase:
+        return
+    try:
+        row = {
+            "id": str(uuid.uuid4()),
+            "session_id": session_id,
+            "event_type": event_type,
+            "tool_name": data.get("tool", ""),
+            "arguments": json.dumps(data.get("arguments", {})),
+            "result": json.dumps(data.get("result", {})),
+            "from_client": data.get("from_client", ""),
+            "status": data.get("status", "logged"),
+            "created_at": data.get("ts", datetime.now(timezone.utc).isoformat()),
+        }
+        supabase.table("mcp_file_events").insert(row).execute()
+    except Exception as exc:
+        logger.warning(f"Event log write skipped: {exc}")
+
+
 @app.on_event("startup")
 async def startup():
     global supabase
+    # 1) workspace
+    ensure_workspace()
+
+    # 2) sync Supabase client (REST API)
     if SUPABASE_URL and SUPABASE_ANON_KEY:
         try:
             supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
             logger.info("Supabase client created (REST API)")
-            # Try to create table via RPC or just test connection
             await ensure_table()
         except Exception as e:
             logger.error(f"Failed to create Supabase client: {e}")
     else:
         logger.warning("Supabase URL or ANON_KEY not set — skipping client init")
+
+    # 3) Async Realtime handler
+    realtime_handler.log_event_cb = _log_event_to_db
+    ok = await realtime_handler.initialize()
+    if ok:
+        logger.info("Realtime handler initialized — ready to join sessions")
+    else:
+        logger.warning("Realtime handler could not start")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await realtime_handler.shutdown()
+    logger.info("App shutdown complete")
 
 async def ensure_table():
     """Create mcp_clients table if it doesn't exist using Supabase SQL."""
@@ -110,7 +206,7 @@ async def health_check():
     if supabase:
         try:
             # Test connection by querying
-            result = supabase.table('mcp_clients').select('id').limit(1).execute()
+            supabase.table('mcp_clients').select('id').limit(1).execute()
             connected = True
             table_ready = True
             message = "Connected to Supabase — mcp_clients table ready"
@@ -184,10 +280,11 @@ async def root():
 
 @api_router.get("/setup-sql")
 async def get_setup_sql():
-    """Returns the SQL needed to create the mcp_clients table."""
+    """Returns the SQL needed to create all MCP tunnel tables."""
     return {
         "instruction": "Run this SQL in your Supabase SQL Editor (Dashboard > SQL Editor > New Query)",
         "sql": """
+-- ===================== MCP Clients =====================
 CREATE TABLE IF NOT EXISTS mcp_clients (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -195,18 +292,220 @@ CREATE TABLE IF NOT EXISTS mcp_clients (
     status TEXT DEFAULT 'registered',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Enable Realtime for this table
-ALTER PUBLICATION supabase_realtime ADD TABLE mcp_clients;
-
--- Enable RLS (required for anon key access)
 ALTER TABLE mcp_clients ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "anon_mcp_clients" ON mcp_clients FOR ALL USING (true) WITH CHECK (true);
 
--- Allow anon read/write for POC (restrict in production)
-CREATE POLICY "Allow anon full access" ON mcp_clients
-    FOR ALL USING (true) WITH CHECK (true);
+-- ===================== MCP Sessions =====================
+CREATE TABLE IF NOT EXISTS mcp_sessions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    channel_name TEXT NOT NULL,
+    status TEXT DEFAULT 'active',
+    created_by TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE mcp_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "anon_mcp_sessions" ON mcp_sessions FOR ALL USING (true) WITH CHECK (true);
+
+-- ===================== MCP File Events =====================
+CREATE TABLE IF NOT EXISTS mcp_file_events (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    tool_name TEXT NOT NULL DEFAULT '',
+    arguments JSONB DEFAULT '{}',
+    result JSONB DEFAULT '{}',
+    from_client TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE mcp_file_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "anon_mcp_file_events" ON mcp_file_events FOR ALL USING (true) WITH CHECK (true);
+
+-- ===================== Realtime Publication =====================
+ALTER PUBLICATION supabase_realtime ADD TABLE mcp_clients;
+ALTER PUBLICATION supabase_realtime ADD TABLE mcp_sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE mcp_file_events;
 """
     }
+
+
+# ---------- Session Endpoints ----------
+
+@api_router.post("/sessions", response_model=MCPSession)
+async def create_session(body: MCPSessionCreate):
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    sess = MCPSession(
+        name=body.name,
+        channel_name=f"mcp-session-{uuid.uuid4().hex[:12]}",
+        created_by=body.created_by,
+    )
+    # Use the session id as part of channel name for determinism
+    sess.channel_name = f"mcp-session-{sess.id}"
+    try:
+        supabase.table("mcp_sessions").insert({
+            "id": sess.id,
+            "name": sess.name,
+            "channel_name": sess.channel_name,
+            "status": sess.status,
+            "created_by": sess.created_by,
+            "created_at": sess.created_at,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return sess
+
+
+@api_router.get("/sessions", response_model=List[MCPSession])
+async def list_sessions():
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        result = supabase.table("mcp_sessions").select("*").order("created_at", desc=True).execute()
+        return [MCPSession(**r) for r in result.data]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/sessions/active/list")
+async def list_active_sessions():
+    return {
+        "active_sessions": realtime_handler.list_active_sessions(),
+        "client_id": realtime_handler.client_id,
+        "realtime_active": realtime_handler.active,
+    }
+
+
+@api_router.get("/sessions/{session_id}", response_model=MCPSession)
+async def get_session(session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        result = supabase.table("mcp_sessions").select("*").eq("id", session_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return MCPSession(**result.data[0])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    # leave realtime first
+    await realtime_handler.leave_session(session_id)
+    try:
+        supabase.table("mcp_sessions").delete().eq("id", session_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "deleted", "id": session_id}
+
+
+# ---------- Realtime Activation ----------
+
+@api_router.post("/sessions/{session_id}/activate")
+async def activate_session(session_id: str):
+    """Start the Realtime listener for this session (Client A joins channel)."""
+    ok = await realtime_handler.join_session(session_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to activate realtime listener")
+    return {
+        "status": "activated",
+        "session_id": session_id,
+        "client_id": realtime_handler.client_id,
+        "channel": f"mcp-session-{session_id}",
+    }
+
+
+@api_router.post("/sessions/{session_id}/deactivate")
+async def deactivate_session(session_id: str):
+    """Stop the Realtime listener for this session."""
+    await realtime_handler.leave_session(session_id)
+    return {"status": "deactivated", "session_id": session_id}
+
+
+# ---------- MCP File Tool Endpoints (Direct REST) ----------
+
+@api_router.get("/tools")
+async def list_tools():
+    """List all available MCP tools and their schemas."""
+    return {"tools": TOOL_SCHEMAS}
+
+
+@api_router.post("/tools/call")
+async def call_tool(body: ToolCallRequest):
+    """Execute an MCP tool directly via REST."""
+    result = dispatch_tool(body.tool, body.arguments)
+    return {"tool": body.tool, "arguments": body.arguments, "result": result}
+
+
+@api_router.get("/workspace/list")
+async def workspace_list(path: str = "."):
+    return dispatch_tool("list_directory", {"path": path})
+
+
+@api_router.get("/workspace/read")
+async def workspace_read(path: str):
+    return dispatch_tool("read_file", {"path": path})
+
+
+@api_router.post("/workspace/write")
+async def workspace_write(body: WriteFileRequest):
+    return dispatch_tool("write_file", {"path": body.path, "content": body.content})
+
+
+@api_router.post("/workspace/edit")
+async def workspace_edit(body: EditFileRequest):
+    return dispatch_tool("edit_file", {
+        "path": body.path,
+        "old_text": body.old_text,
+        "new_text": body.new_text,
+    })
+
+
+@api_router.delete("/workspace/delete")
+async def workspace_delete(path: str):
+    return dispatch_tool("delete_file", {"path": path})
+
+
+@api_router.post("/workspace/mkdir")
+async def workspace_mkdir(body: CreateDirRequest):
+    return dispatch_tool("create_directory", {"path": body.path})
+
+
+@api_router.post("/workspace/move")
+async def workspace_move(body: MoveFileRequest):
+    return dispatch_tool("move_file", {"source": body.source, "destination": body.destination})
+
+
+@api_router.get("/workspace/info")
+async def workspace_info(path: str):
+    return dispatch_tool("get_file_info", {"path": path})
+
+
+@api_router.get("/workspace/search")
+async def workspace_search(pattern: str, path: str = "."):
+    return dispatch_tool("search_files", {"pattern": pattern, "path": path})
+
+
+# ---------- File Events (Audit Log) ----------
+
+@api_router.get("/events")
+async def list_events(session_id: Optional[str] = None, limit: int = 50):
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    try:
+        q = supabase.table("mcp_file_events").select("*").order("created_at", desc=True).limit(limit)
+        if session_id:
+            q = q.eq("session_id", session_id)
+        result = q.execute()
+        return {"events": result.data, "count": len(result.data)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------- App wiring ----------
 
