@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, HTTPException, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -30,7 +31,43 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 # Supabase client (REST API over HTTPS)
 supabase: Optional[Client] = None
 
-app = FastAPI()
+# MCP Streamable HTTP — import + initialise session manager
+from mcp_server import mcp as _mcp_instance            # noqa: E402
+_mcp_http_app = _mcp_instance.streamable_http_app()     # creates session_manager
+_mcp_session_mgr = _mcp_instance.session_manager
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    # ---- startup ----
+    global supabase
+    ensure_workspace()
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+            logger.info("Supabase client created (REST API)")
+            await ensure_table()
+        except Exception as e:
+            logger.error(f"Failed to create Supabase client: {e}")
+    else:
+        logger.warning("Supabase URL or ANON_KEY not set — skipping client init")
+    realtime_handler.log_event_cb = _log_event_to_db
+    ok = await realtime_handler.initialize()
+    if ok:
+        logger.info("Realtime handler initialized — ready to join sessions")
+    else:
+        logger.warning("Realtime handler could not start")
+
+    # Start MCP session manager task group
+    async with _mcp_session_mgr.run():
+        logger.info("MCP Streamable-HTTP session manager started")
+        yield
+    # ---- shutdown ----
+    await realtime_handler.shutdown()
+    logger.info("App shutdown complete")
+
+
+app = FastAPI(lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(
@@ -173,36 +210,7 @@ async def _log_event_to_db(session_id: str, event_type: str, data: dict):
         logger.warning(f"Event log write skipped: {exc}")
 
 
-@app.on_event("startup")
-async def startup():
-    global supabase
-    # 1) workspace
-    ensure_workspace()
-
-    # 2) sync Supabase client (REST API)
-    if SUPABASE_URL and SUPABASE_ANON_KEY:
-        try:
-            supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-            logger.info("Supabase client created (REST API)")
-            await ensure_table()
-        except Exception as e:
-            logger.error(f"Failed to create Supabase client: {e}")
-    else:
-        logger.warning("Supabase URL or ANON_KEY not set — skipping client init")
-
-    # 3) Async Realtime handler
-    realtime_handler.log_event_cb = _log_event_to_db
-    ok = await realtime_handler.initialize()
-    if ok:
-        logger.info("Realtime handler initialized — ready to join sessions")
-    else:
-        logger.warning("Realtime handler could not start")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    await realtime_handler.shutdown()
-    logger.info("App shutdown complete")
+# Startup / shutdown handled in lifespan() context manager above.
 
 async def ensure_table():
     """Create the core MCP tables if they don't exist using Supabase SQL."""
@@ -808,8 +816,13 @@ async def _auto_activate(session_id: str):
 
 
 @api_router.get("/mcp/clients/{client_id}/config")
-async def get_client_config(client_id: str):
-    """Get MCP configuration JSON for a registered client."""
+async def get_client_config(client_id: str, public_base_url: Optional[str] = None):
+    """Get MCP configuration JSON for a registered client.
+
+    Pass ?public_base_url=https://... to override the server URL in
+    the generated config (useful when handing off to a remote agent
+    that cannot reach localhost).
+    """
     if not supabase:
         raise HTTPException(status_code=503, detail="Supabase not available")
     try:
@@ -821,6 +834,15 @@ async def get_client_config(client_id: str):
         if not meta.get("role"):
             raise HTTPException(status_code=400, detail="Not an MCP-registered client")
         config = _build_mcp_config(row["name"], meta["role"], meta["api_key"], meta["session_id"])
+
+        # Override the server URL when a public base is supplied
+        if public_base_url:
+            safe_url = public_base_url.rstrip("/")
+            safe_name = row["name"].lower().replace(" ", "-")
+            key = f"mcp-tunnel-{safe_name}"
+            if key in config.get("mcpServers", {}):
+                config["mcpServers"][key]["url"] = f"{safe_url}/api"
+
         return {
             "id": client_id,
             "name": row["name"],
@@ -1039,6 +1061,10 @@ async def tunnel_logs(tail: int = 80):
 # ---------- App wiring ----------
 
 app.include_router(api_router)
+
+# Mount the MCP Streamable-HTTP sub-app (session manager started in lifespan)
+# Internal route is /mcp, mount at root so final path = /mcp
+app.mount("/", _mcp_http_app)
 
 app.add_middleware(
     CORSMiddleware,

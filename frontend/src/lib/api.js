@@ -2,6 +2,25 @@ import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+/**
+ * Create an API client bound to an arbitrary base URL.
+ * Used by /clone to talk to a public tunnel backend instead of localhost.
+ */
+export function createApiClient(baseUrl) {
+  const base = `${baseUrl.replace(/\/+$/, "")}/api`;
+  return {
+    health: () => axios.get(`${base}/health`).then((r) => r.data),
+    mcpConnections: () => axios.get(`${base}/mcp/connections`).then((r) => r.data),
+    mcpConfig: (id, publicBaseUrl) => {
+      const params = publicBaseUrl ? { public_base_url: publicBaseUrl } : {};
+      return axios.get(`${base}/mcp/clients/${id}/config`, { params }).then((r) => r.data);
+    },
+    listJobs: () => axios.get(`${base}/jobs`).then((r) => r.data),
+    getJob: (id) => axios.get(`${base}/jobs/${id}`).then((r) => r.data),
+    workspaceList: (path = ".") => axios.get(`${base}/workspace/list`, { params: { path } }).then((r) => r.data),
+  };
+}
+
 export const api = {
   // Health
   health: () => axios.get(`${API}/health`).then((r) => r.data),

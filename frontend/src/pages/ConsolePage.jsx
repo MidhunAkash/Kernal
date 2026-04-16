@@ -2,52 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom";
 import "@/App.css";
 import { api } from "@/lib/api";
+import { copyText, formatDate, buildExecutorPrompt } from "@/lib/mcpHandoff";
 
 const DEFAULT_SERVER_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
-
-function copyText(text) {
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
-  }
-  return fallbackCopy(text);
-}
-
-function fallbackCopy(text) {
-  return new Promise((resolve) => {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    try {
-      document.execCommand("copy");
-    } catch {}
-    document.body.removeChild(ta);
-    resolve();
-  });
-}
-
-function formatDate(value) {
-  if (!value) return "just now";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-}
-
-function buildExecutorPrompt({ job, config }) {
-  return [
-    "Use this MCP job to connect as Client B (expert executor).",
-    `Problem: ${job.title}`,
-    job.context ? `Context: ${job.context}` : null,
-    `Tunnel URL: ${job.tunnel_url}`,
-    "",
-    "Paste or save this config:",
-    JSON.stringify(config, null, 2),
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
 
 function JobCard({ job, onUseJob, onCopyId }) {
   return (
@@ -334,6 +291,9 @@ export default function ConsolePage() {
         <span className="tag">job + tunnel + config</span>
         <Link to="/ops" className="btn-sm nav-link" style={{ marginLeft: "auto" }}>
           ops dashboard →
+        </Link>
+        <Link to="/clone" className="btn-sm nav-link" style={{ marginLeft: ".5rem" }}>
+          clone handoff →
         </Link>
       </header>
 

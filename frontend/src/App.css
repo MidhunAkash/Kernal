@@ -533,6 +533,11 @@ select.inp {
   text-decoration: underline;
 }
 
+.clone-warning {
+  border-left: 3px solid var(--warning, #e5a100);
+  background: rgba(229, 161, 0, 0.06);
+}
+
 @media (max-width: 860px) {
   .hero-grid,
   .summary-grid {
