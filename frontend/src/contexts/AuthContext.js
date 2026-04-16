@@ -1,72 +1,115 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
 
-const api = axios.create({
-  baseURL: process.env.REACT_APP_BACKEND_URL,
-  withCredentials: true
-});
-
-function formatApiErrorDetail(detail) {
-  if (detail == null) return "Something went wrong. Please try again.";
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail))
-    return detail.map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e))).filter(Boolean).join(" ");
-  if (detail && typeof detail.msg === "string") return detail.msg;
-  return String(detail);
-}
-
-export function AuthProvider({ children }) {
+export function AuthProvider({ children}) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const { data } = await api.get('/api/auth/me');
-      setUser(data);
-    } catch (error) {
-      setUser(false);
-    } finally {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
       setLoading(false);
-    }
-  };
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const register = async (email, password, name) => {
     try {
-      const { data } = await api.post('/api/auth/register', { email, password, name });
-      setUser(data);
-      return { success: true };
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      return { success: true, data };
     } catch (error) {
-      return { success: false, error: formatApiErrorDetail(error.response?.data?.detail) || error.message };
+      return { success: false, error: error.message };
     }
   };
 
   const login = async (email, password) => {
     try {
-      const { data } = await api.post('/api/auth/login', { email, password });
-      setUser(data);
-      return { success: true };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      return { success: true, data };
     } catch (error) {
-      return { success: false, error: formatApiErrorDetail(error.response?.data?.detail) || error.message };
+      return { success: false, error: error.message };
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const loginWithGithub = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
   };
 
   const logout = async () => {
     try {
-      await api.post('/api/auth/logout');
-      setUser(false);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+      setSession(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
+    <AuthContext.Provider value={{ user, session, loading, register, login, loginWithGoogle, loginWithGithub, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -79,5 +122,3 @@ export function useAuth() {
   }
   return context;
 }
-
-export { api };

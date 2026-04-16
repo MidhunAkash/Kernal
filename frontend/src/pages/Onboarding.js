@@ -19,7 +19,7 @@ function Onboarding() {
           <div className="flex justify-between items-center py-4">
             <h1 className="text-xl font-black">KERNAL.TECH.HELP</h1>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
+              <span className="text-sm text-gray-600">Welcome, {user?.user_metadata?.name || user?.email}</span>
               <button
                 onClick={handleLogout}
                 className="text-sm text-gray-600 hover:text-black"
@@ -44,9 +44,9 @@ function Onboarding() {
             <div className="bg-gray-50 rounded-lg p-8 mb-8">
               <h3 className="text-lg font-bold mb-4">Your Account Details</h3>
               <div className="space-y-2 text-left">
-                <p><span className="font-medium">Name:</span> {user?.name}</p>
+                <p><span className="font-medium">Name:</span> {user?.user_metadata?.name || 'Not provided'}</p>
                 <p><span className="font-medium">Email:</span> {user?.email}</p>
-                <p><span className="font-medium">Role:</span> {user?.role}</p>
+                <p><span className="font-medium">ID:</span> {user?.id}</p>
               </div>
             </div>
 
