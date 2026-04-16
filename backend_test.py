@@ -1,323 +1,669 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for MCP Tunnel
-Tests all workspace file operations, health, setup SQL, and session endpoints.
+Comprehensive Backend Testing for MCP Tunnel
+Tests all backend endpoints with Supabase tables now created
 """
 
 import requests
 import json
-import sys
-import os
-from pathlib import Path
+import time
+import uuid
+from typing import Dict, Any, Optional
 
-# Get backend URL from frontend .env
-def get_backend_url():
-    frontend_env = Path("/app/frontend/.env")
-    if frontend_env.exists():
-        with open(frontend_env) as f:
-            for line in f:
-                if line.startswith("REACT_APP_BACKEND_URL="):
-                    return line.split("=", 1)[1].strip()
-    return "http://localhost:8001"
+# Backend URL from frontend/.env
+BACKEND_URL = "https://supabase-mcp-4.preview.emergentagent.com/api"
 
-BASE_URL = get_backend_url()
-API_URL = f"{BASE_URL}/api"
-
-print(f"Testing MCP Tunnel Backend at: {API_URL}")
-print("=" * 60)
-
-def test_endpoint(method, endpoint, data=None, params=None, expected_status=200):
-    """Test an API endpoint and return response."""
-    url = f"{API_URL}{endpoint}"
-    try:
-        if method.upper() == "GET":
-            response = requests.get(url, params=params, timeout=10)
-        elif method.upper() == "POST":
-            response = requests.post(url, json=data, timeout=10)
-        elif method.upper() == "DELETE":
-            response = requests.delete(url, params=params, timeout=10)
-        else:
-            print(f"❌ Unsupported method: {method}")
-            return None
-            
-        print(f"{method.upper()} {endpoint}")
-        print(f"Status: {response.status_code}")
+class MCPTunnelTester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.test_session_id = None
+        self.test_results = []
         
-        if response.status_code == expected_status:
-            print("✅ Status OK")
-        else:
-            print(f"❌ Expected {expected_status}, got {response.status_code}")
-            
+    def log_test(self, test_name: str, success: bool, details: str, response_data: Any = None):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        print(f"   Details: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+        print()
+        
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'response': response_data if not success else None
+        })
+    
+    def test_health_check(self):
+        """Test 1: Health check endpoint"""
         try:
-            result = response.json()
-            print(f"Response: {json.dumps(result, indent=2)[:500]}...")
-        except:
-            print(f"Response: {response.text[:200]}...")
+            response = self.session.get(f"{BACKEND_URL}/health")
             
-        print("-" * 40)
-        return response
-    except Exception as e:
-        print(f"❌ Request failed: {e}")
-        print("-" * 40)
-        return None
-
-def main():
-    print("🔍 TESTING MCP TUNNEL BACKEND")
-    print()
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check required fields
+                supabase_connected = data.get('supabase_connected', False)
+                table_ready = data.get('table_ready', False)
+                
+                if supabase_connected and table_ready:
+                    self.log_test(
+                        "Health Check", 
+                        True, 
+                        f"Health endpoint working. supabase_connected={supabase_connected}, table_ready={table_ready}"
+                    )
+                else:
+                    self.log_test(
+                        "Health Check", 
+                        False, 
+                        f"Health endpoint returned supabase_connected={supabase_connected}, table_ready={table_ready} (expected both true)",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "Health Check", 
+                    False, 
+                    f"Health endpoint returned status {response.status_code}",
+                    response.text
+                )
+                
+        except Exception as e:
+            self.log_test("Health Check", False, f"Exception: {str(e)}")
     
-    # 1. Health Check
-    print("1️⃣ HEALTH CHECK")
-    health_resp = test_endpoint("GET", "/health")
-    if health_resp and health_resp.status_code == 200:
-        health_data = health_resp.json()
-        print(f"✅ Health check passed")
-        print(f"   Supabase connected: {health_data.get('supabase_connected')}")
-        print(f"   Table ready: {health_data.get('table_ready')}")
-    else:
-        print("❌ Health check failed")
-    print()
+    def test_session_management(self):
+        """Test 2: Session management endpoints"""
+        
+        # 2a. List sessions (should have at least 1 "test-tunnel" session)
+        try:
+            response = self.session.get(f"{BACKEND_URL}/sessions")
+            
+            if response.status_code == 200:
+                sessions = response.json()
+                test_tunnel_exists = any(s.get('name') == 'test-tunnel' for s in sessions)
+                
+                if test_tunnel_exists:
+                    self.log_test(
+                        "List Sessions", 
+                        True, 
+                        f"Found {len(sessions)} sessions including 'test-tunnel'"
+                    )
+                else:
+                    self.log_test(
+                        "List Sessions", 
+                        False, 
+                        f"Found {len(sessions)} sessions but no 'test-tunnel' session",
+                        sessions
+                    )
+            else:
+                self.log_test(
+                    "List Sessions", 
+                    False, 
+                    f"List sessions returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("List Sessions", False, f"Exception: {str(e)}")
+        
+        # 2b. Create a new session
+        try:
+            session_data = {
+                "name": "e2e-test",
+                "created_by": "test-agent"
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/sessions", json=session_data)
+            
+            if response.status_code in [200, 201]:
+                created_session = response.json()
+                self.test_session_id = created_session.get('id')
+                
+                if self.test_session_id:
+                    self.log_test(
+                        "Create Session", 
+                        True, 
+                        f"Created session with ID: {self.test_session_id}"
+                    )
+                else:
+                    self.log_test(
+                        "Create Session", 
+                        False, 
+                        "Session created but no ID returned",
+                        created_session
+                    )
+            else:
+                self.log_test(
+                    "Create Session", 
+                    False, 
+                    f"Create session returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Create Session", False, f"Exception: {str(e)}")
+        
+        # 2c. Get the created session
+        if self.test_session_id:
+            try:
+                response = self.session.get(f"{BACKEND_URL}/sessions/{self.test_session_id}")
+                
+                if response.status_code == 200:
+                    session = response.json()
+                    if session.get('name') == 'e2e-test':
+                        self.log_test(
+                            "Get Session by ID", 
+                            True, 
+                            f"Retrieved session: {session.get('name')}"
+                        )
+                    else:
+                        self.log_test(
+                            "Get Session by ID", 
+                            False, 
+                            f"Retrieved session but name mismatch: {session.get('name')}",
+                            session
+                        )
+                else:
+                    self.log_test(
+                        "Get Session by ID", 
+                        False, 
+                        f"Get session returned status {response.status_code}",
+                        response.text
+                    )
+            except Exception as e:
+                self.log_test("Get Session by ID", False, f"Exception: {str(e)}")
+        
+        # 2d. Get active sessions list
+        try:
+            response = self.session.get(f"{BACKEND_URL}/sessions/active/list")
+            
+            if response.status_code == 200:
+                active_data = response.json()
+                client_id = active_data.get('client_id')
+                active_sessions = active_data.get('active_sessions', [])
+                
+                if client_id:
+                    self.log_test(
+                        "Get Active Sessions", 
+                        True, 
+                        f"Active sessions endpoint working. Client ID: {client_id}, Active sessions: {len(active_sessions)}"
+                    )
+                else:
+                    self.log_test(
+                        "Get Active Sessions", 
+                        False, 
+                        "Active sessions endpoint returned no client_id",
+                        active_data
+                    )
+            else:
+                self.log_test(
+                    "Get Active Sessions", 
+                    False, 
+                    f"Get active sessions returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Get Active Sessions", False, f"Exception: {str(e)}")
+        
+        # 2e. Activate the new session
+        if self.test_session_id:
+            try:
+                response = self.session.post(f"{BACKEND_URL}/sessions/{self.test_session_id}/activate")
+                
+                if response.status_code in [200, 201]:
+                    self.log_test(
+                        "Activate Session", 
+                        True, 
+                        f"Session {self.test_session_id} activated successfully"
+                    )
+                else:
+                    self.log_test(
+                        "Activate Session", 
+                        False, 
+                        f"Activate session returned status {response.status_code}",
+                        response.text
+                    )
+            except Exception as e:
+                self.log_test("Activate Session", False, f"Exception: {str(e)}")
+        
+        # 2f. Deactivate the session
+        if self.test_session_id:
+            try:
+                response = self.session.post(f"{BACKEND_URL}/sessions/{self.test_session_id}/deactivate")
+                
+                if response.status_code in [200, 201]:
+                    self.log_test(
+                        "Deactivate Session", 
+                        True, 
+                        f"Session {self.test_session_id} deactivated successfully"
+                    )
+                else:
+                    self.log_test(
+                        "Deactivate Session", 
+                        False, 
+                        f"Deactivate session returned status {response.status_code}",
+                        response.text
+                    )
+            except Exception as e:
+                self.log_test("Deactivate Session", False, f"Exception: {str(e)}")
     
-    # 2. Setup SQL
-    print("2️⃣ SETUP SQL ENDPOINT")
-    setup_resp = test_endpoint("GET", "/setup-sql")
-    if setup_resp and setup_resp.status_code == 200:
-        setup_data = setup_resp.json()
-        sql = setup_data.get('sql', '')
-        if 'mcp_clients' in sql and 'mcp_sessions' in sql and 'mcp_file_events' in sql:
-            print("✅ Setup SQL contains all 3 required tables")
-        else:
-            print("❌ Setup SQL missing required tables")
-    else:
-        print("❌ Setup SQL endpoint failed")
-    print()
+    def test_mcp_file_tools(self):
+        """Test 3: MCP File Tools"""
+        
+        # 3a. List all tool schemas
+        try:
+            response = self.session.get(f"{BACKEND_URL}/tools")
+            
+            if response.status_code == 200:
+                data = response.json()
+                tools = data.get('tools', {})
+                
+                expected_tools = [
+                    'read_file', 'write_file', 'edit_file', 'list_directory', 
+                    'create_directory', 'delete_file', 'move_file', 'get_file_info', 'search_files'
+                ]
+                
+                if len(tools) == 9 and all(tool in tools for tool in expected_tools):
+                    tool_names = list(tools.keys())
+                    self.log_test(
+                        "List Tool Schemas", 
+                        True, 
+                        f"All 9 expected tools found: {', '.join(tool_names)}"
+                    )
+                else:
+                    missing = [tool for tool in expected_tools if tool not in tools]
+                    self.log_test(
+                        "List Tool Schemas", 
+                        False, 
+                        f"Missing tools: {missing}. Found: {list(tools.keys())}",
+                        data
+                    )
+            else:
+                self.log_test(
+                    "List Tool Schemas", 
+                    False, 
+                    f"List tools returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("List Tool Schemas", False, f"Exception: {str(e)}")
+        
+        # 3b. Test list_directory
+        try:
+            tool_call = {
+                "tool": "list_directory",
+                "arguments": {"path": "."}
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success') and 'entries' in tool_result:
+                    entries = tool_result['entries']
+                    self.log_test(
+                        "Tool: list_directory", 
+                        True, 
+                        f"Listed {len(entries)} workspace files"
+                    )
+                else:
+                    self.log_test(
+                        "Tool: list_directory", 
+                        False, 
+                        "Tool call succeeded but unexpected result format",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: list_directory", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: list_directory", False, f"Exception: {str(e)}")
+        
+        # 3c. Test write_file
+        try:
+            tool_call = {
+                "tool": "write_file",
+                "arguments": {
+                    "path": "agent-test.txt",
+                    "content": "test content"
+                }
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success'):
+                    self.log_test(
+                        "Tool: write_file", 
+                        True, 
+                        "Successfully wrote agent-test.txt"
+                    )
+                else:
+                    self.log_test(
+                        "Tool: write_file", 
+                        False, 
+                        f"Tool call failed: {tool_result.get('error', 'Unknown error')}",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: write_file", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: write_file", False, f"Exception: {str(e)}")
+        
+        # 3d. Test read_file
+        try:
+            tool_call = {
+                "tool": "read_file",
+                "arguments": {"path": "agent-test.txt"}
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success') and tool_result.get('content') == 'test content':
+                    self.log_test(
+                        "Tool: read_file", 
+                        True, 
+                        "Successfully read agent-test.txt with correct content"
+                    )
+                else:
+                    self.log_test(
+                        "Tool: read_file", 
+                        False, 
+                        f"Tool call failed or content mismatch: {tool_result.get('error', 'Unknown error')}",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: read_file", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: read_file", False, f"Exception: {str(e)}")
+        
+        # 3e. Test edit_file
+        try:
+            tool_call = {
+                "tool": "edit_file",
+                "arguments": {
+                    "path": "agent-test.txt",
+                    "old_text": "test",
+                    "new_text": "verified"
+                }
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success'):
+                    self.log_test(
+                        "Tool: edit_file", 
+                        True, 
+                        "Successfully edited agent-test.txt"
+                    )
+                else:
+                    self.log_test(
+                        "Tool: edit_file", 
+                        False, 
+                        f"Tool call failed: {tool_result.get('error', 'Unknown error')}",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: edit_file", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: edit_file", False, f"Exception: {str(e)}")
+        
+        # 3f. Test get_file_info
+        try:
+            tool_call = {
+                "tool": "get_file_info",
+                "arguments": {"path": "agent-test.txt"}
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success') and 'size' in tool_result:
+                    file_info = tool_result
+                    self.log_test(
+                        "Tool: get_file_info", 
+                        True, 
+                        f"Got file info: size={file_info.get('size')}, type={file_info.get('type')}"
+                    )
+                else:
+                    self.log_test(
+                        "Tool: get_file_info", 
+                        False, 
+                        f"Tool call failed: {tool_result.get('error', 'Unknown error')}",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: get_file_info", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: get_file_info", False, f"Exception: {str(e)}")
+        
+        # 3g. Test search_files
+        try:
+            tool_call = {
+                "tool": "search_files",
+                "arguments": {"pattern": "*.txt"}
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/tools/call", json=tool_call)
+            
+            if response.status_code == 200:
+                result = response.json()
+                tool_result = result.get('result', {})
+                if tool_result.get('success') and 'matches' in tool_result:
+                    matches = tool_result['matches']
+                    txt_files = [f['path'] for f in matches if f['path'].endswith('.txt')]
+                    if 'agent-test.txt' in txt_files:
+                        self.log_test(
+                            "Tool: search_files", 
+                            True, 
+                            f"Found {len(txt_files)} .txt files including agent-test.txt"
+                        )
+                    else:
+                        self.log_test(
+                            "Tool: search_files", 
+                            False, 
+                            f"Found {len(txt_files)} .txt files but not agent-test.txt",
+                            matches
+                        )
+                else:
+                    self.log_test(
+                        "Tool: search_files", 
+                        False, 
+                        f"Tool call failed: {tool_result.get('error', 'Unknown error')}",
+                        result
+                    )
+            else:
+                self.log_test(
+                    "Tool: search_files", 
+                    False, 
+                    f"Tool call returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Tool: search_files", False, f"Exception: {str(e)}")
     
-    # 3. Tools List
-    print("3️⃣ MCP TOOLS LIST")
-    tools_resp = test_endpoint("GET", "/tools")
-    if tools_resp and tools_resp.status_code == 200:
-        tools_data = tools_resp.json()
-        tools = tools_data.get('tools', {})
-        expected_tools = [
-            'read_file', 'write_file', 'edit_file', 'list_directory',
-            'create_directory', 'delete_file', 'move_file', 'get_file_info', 'search_files'
-        ]
-        found_tools = list(tools.keys())
-        if len(found_tools) >= 9 and all(tool in found_tools for tool in expected_tools):
-            print(f"✅ All 9 MCP tools found: {found_tools}")
-        else:
-            print(f"❌ Missing tools. Found: {found_tools}")
-    else:
-        print("❌ Tools list endpoint failed")
-    print()
+    def test_events_audit_log(self):
+        """Test 4: Events audit log"""
+        
+        # 4a. Get all events
+        try:
+            response = self.session.get(f"{BACKEND_URL}/events")
+            
+            if response.status_code == 200:
+                events = response.json()
+                self.log_test(
+                    "Get All Events", 
+                    True, 
+                    f"Retrieved {len(events)} persisted events from audit log"
+                )
+            else:
+                self.log_test(
+                    "Get All Events", 
+                    False, 
+                    f"Get events returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Get All Events", False, f"Exception: {str(e)}")
+        
+        # 4b. Get events filtered by session_id
+        try:
+            session_id = "9dd8fbc3-01fa-4d2a-8ef2-1574bed0964c"
+            response = self.session.get(f"{BACKEND_URL}/events?session_id={session_id}")
+            
+            if response.status_code == 200:
+                events = response.json()
+                self.log_test(
+                    "Get Events by Session ID", 
+                    True, 
+                    f"Retrieved {len(events)} events for session {session_id}"
+                )
+            else:
+                self.log_test(
+                    "Get Events by Session ID", 
+                    False, 
+                    f"Get events by session returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Get Events by Session ID", False, f"Exception: {str(e)}")
     
-    # 4. Workspace Operations
-    print("4️⃣ WORKSPACE FILE OPERATIONS")
+    def test_setup_sql(self):
+        """Test 5: Setup SQL endpoint"""
+        try:
+            response = self.session.get(f"{BACKEND_URL}/setup-sql")
+            
+            if response.status_code == 200:
+                sql_content = response.text
+                
+                # Check for corrected SQL pattern (DROP POLICY IF EXISTS)
+                if "DROP POLICY IF EXISTS" in sql_content:
+                    self.log_test(
+                        "Setup SQL", 
+                        True, 
+                        "Setup SQL endpoint returns corrected SQL with 'DROP POLICY IF EXISTS' pattern"
+                    )
+                else:
+                    self.log_test(
+                        "Setup SQL", 
+                        False, 
+                        "Setup SQL missing 'DROP POLICY IF EXISTS' pattern",
+                        sql_content[:500] + "..." if len(sql_content) > 500 else sql_content
+                    )
+            else:
+                self.log_test(
+                    "Setup SQL", 
+                    False, 
+                    f"Setup SQL returned status {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Setup SQL", False, f"Exception: {str(e)}")
     
-    # 4a. List workspace
-    print("📁 List workspace directory")
-    list_resp = test_endpoint("GET", "/workspace/list")
-    if list_resp and list_resp.status_code == 200:
-        print("✅ Workspace list successful")
-    else:
-        print("❌ Workspace list failed")
+    def cleanup_test_session(self):
+        """Clean up: Delete the test session"""
+        if self.test_session_id:
+            try:
+                response = self.session.delete(f"{BACKEND_URL}/sessions/{self.test_session_id}")
+                
+                if response.status_code in [200, 204]:
+                    self.log_test(
+                        "Delete Test Session", 
+                        True, 
+                        f"Successfully deleted test session {self.test_session_id}"
+                    )
+                else:
+                    self.log_test(
+                        "Delete Test Session", 
+                        False, 
+                        f"Delete session returned status {response.status_code}",
+                        response.text
+                    )
+            except Exception as e:
+                self.log_test("Delete Test Session", False, f"Exception: {str(e)}")
     
-    # 4b. Read existing file
-    print("📖 Read README.md")
-    read_resp = test_endpoint("GET", "/workspace/read", params={"path": "README.md"})
-    if read_resp and read_resp.status_code == 200:
-        read_data = read_resp.json()
-        if read_data.get('success') and 'content' in read_data:
-            print("✅ File read successful")
-        else:
-            print("❌ File read failed - no content")
-    else:
-        print("❌ File read endpoint failed")
-    
-    # 4c. Create directory
-    print("📁 Create test directory")
-    mkdir_resp = test_endpoint("POST", "/workspace/mkdir", data={"path": "test"})
-    if mkdir_resp and mkdir_resp.status_code == 200:
-        mkdir_data = mkdir_resp.json()
-        if mkdir_data.get('success'):
-            print("✅ Directory creation successful")
-        else:
-            print("❌ Directory creation failed")
-    else:
-        print("❌ Directory creation endpoint failed")
-    
-    # 4d. Write file
-    print("✍️ Write test file")
-    write_resp = test_endpoint("POST", "/workspace/write", 
-                              data={"path": "test/hello.txt", "content": "Hello World"})
-    if write_resp and write_resp.status_code == 200:
-        write_data = write_resp.json()
-        if write_data.get('success'):
-            print("✅ File write successful")
-        else:
-            print("❌ File write failed")
-    else:
-        print("❌ File write endpoint failed")
-    
-    # 4e. Edit file
-    print("✏️ Edit test file")
-    edit_resp = test_endpoint("POST", "/workspace/edit", 
-                             data={"path": "test/hello.txt", "old_text": "Hello", "new_text": "Hi"})
-    if edit_resp and edit_resp.status_code == 200:
-        edit_data = edit_resp.json()
-        if edit_data.get('success'):
-            print("✅ File edit successful")
-        else:
-            print("❌ File edit failed")
-    else:
-        print("❌ File edit endpoint failed")
-    
-    # 4f. Get file info
-    print("ℹ️ Get file info")
-    info_resp = test_endpoint("GET", "/workspace/info", params={"path": "test/hello.txt"})
-    if info_resp and info_resp.status_code == 200:
-        info_data = info_resp.json()
-        if info_data.get('success') and 'size' in info_data:
-            print("✅ File info successful")
-        else:
-            print("❌ File info failed")
-    else:
-        print("❌ File info endpoint failed")
-    
-    # 4g. Search files
-    print("🔍 Search for txt files")
-    search_resp = test_endpoint("GET", "/workspace/search", params={"pattern": "*.txt"})
-    if search_resp and search_resp.status_code == 200:
-        search_data = search_resp.json()
-        if search_data.get('success') and 'matches' in search_data:
-            print(f"✅ File search successful - found {search_data.get('count', 0)} matches")
-        else:
-            print("❌ File search failed")
-    else:
-        print("❌ File search endpoint failed")
-    
-    # 4h. Create subdirectory
-    print("📁 Create subdirectory")
-    subdir_resp = test_endpoint("POST", "/workspace/mkdir", data={"path": "test/subdir"})
-    if subdir_resp and subdir_resp.status_code == 200:
-        print("✅ Subdirectory creation successful")
-    else:
-        print("❌ Subdirectory creation failed")
-    
-    # 4i. Move file
-    print("📦 Move file")
-    move_resp = test_endpoint("POST", "/workspace/move", 
-                             data={"source": "test/hello.txt", "destination": "test/moved.txt"})
-    if move_resp and move_resp.status_code == 200:
-        move_data = move_resp.json()
-        if move_data.get('success'):
-            print("✅ File move successful")
-        else:
-            print("❌ File move failed")
-    else:
-        print("❌ File move endpoint failed")
-    
-    # 4j. Delete subdirectory
-    print("🗑️ Delete subdirectory")
-    delete_resp = test_endpoint("DELETE", "/workspace/delete", params={"path": "test/subdir"})
-    if delete_resp and delete_resp.status_code == 200:
-        delete_data = delete_resp.json()
-        if delete_data.get('success'):
-            print("✅ Directory deletion successful")
-        else:
-            print("❌ Directory deletion failed")
-    else:
-        print("❌ Directory deletion endpoint failed")
-    
-    # 4k. Test path traversal protection
-    print("🛡️ Test path traversal protection")
-    traversal_resp = test_endpoint("GET", "/workspace/read", params={"path": "../../etc/passwd"})
-    if traversal_resp and traversal_resp.status_code == 200:
-        traversal_data = traversal_resp.json()
-        if not traversal_data.get('success') and 'error' in traversal_data:
-            print("✅ Path traversal blocked successfully")
-        else:
-            print("❌ Path traversal not blocked!")
-    else:
-        print("❌ Path traversal test endpoint failed")
-    
-    print()
-    
-    # 5. Generic Tool Call
-    print("5️⃣ GENERIC TOOL DISPATCHER")
-    tool_call_resp = test_endpoint("POST", "/tools/call", 
-                                  data={"tool": "list_directory", "arguments": {"path": "."}})
-    if tool_call_resp and tool_call_resp.status_code == 200:
-        tool_data = tool_call_resp.json()
-        if 'result' in tool_data and tool_data['result'].get('success'):
-            print("✅ Generic tool call successful")
-        else:
-            print("❌ Generic tool call failed")
-    else:
-        print("❌ Generic tool call endpoint failed")
-    print()
-    
-    # 6. Active Sessions
-    print("6️⃣ ACTIVE SESSIONS")
-    active_resp = test_endpoint("GET", "/sessions/active/list")
-    if active_resp and active_resp.status_code == 200:
-        active_data = active_resp.json()
-        if 'active_sessions' in active_data and 'client_id' in active_data:
-            print(f"✅ Active sessions endpoint working")
-            print(f"   Client ID: {active_data.get('client_id')}")
-            print(f"   Active sessions: {active_data.get('active_sessions')}")
-        else:
-            print("❌ Active sessions response missing required fields")
-    else:
-        print("❌ Active sessions endpoint failed")
-    print()
-    
-    # 7. Session Management (may fail if Supabase tables don't exist)
-    print("7️⃣ SESSION MANAGEMENT (may fail without Supabase tables)")
-    
-    # 7a. Create session
-    print("➕ Create session")
-    create_session_resp = test_endpoint("POST", "/sessions", 
-                                       data={"name": "test-session", "created_by": "test-client"})
-    session_id = None
-    if create_session_resp:
-        if create_session_resp.status_code == 200:
-            session_data = create_session_resp.json()
-            session_id = session_data.get('id')
-            print(f"✅ Session created successfully: {session_id}")
-        elif create_session_resp.status_code == 500:
-            print("⚠️ Session creation failed (expected - Supabase tables may not exist)")
-        else:
-            print(f"❌ Session creation failed with status {create_session_resp.status_code}")
-    
-    # 7b. List sessions
-    print("📋 List sessions")
-    list_sessions_resp = test_endpoint("GET", "/sessions")
-    if list_sessions_resp:
-        if list_sessions_resp.status_code == 200:
-            print("✅ Session list successful")
-        elif list_sessions_resp.status_code == 500:
-            print("⚠️ Session list failed (expected - Supabase tables may not exist)")
-        else:
-            print(f"❌ Session list failed with status {list_sessions_resp.status_code}")
-    
-    print()
-    
-    # 8. Events endpoint (may fail if Supabase tables don't exist)
-    print("8️⃣ EVENTS ENDPOINT (may fail without Supabase tables)")
-    events_resp = test_endpoint("GET", "/events")
-    if events_resp:
-        if events_resp.status_code == 200:
-            print("✅ Events endpoint successful")
-        elif events_resp.status_code == 500:
-            print("⚠️ Events endpoint failed (expected - Supabase tables may not exist)")
-        else:
-            print(f"❌ Events endpoint failed with status {events_resp.status_code}")
-    
-    print()
-    print("🏁 TESTING COMPLETE")
-    print("=" * 60)
-    print("NOTE: Session and event endpoint failures are expected if Supabase tables haven't been created yet.")
-    print("Use the setup SQL from /api/setup-sql to create the required tables in Supabase.")
+    def run_all_tests(self):
+        """Run all backend tests"""
+        print("=" * 80)
+        print("MCP TUNNEL BACKEND COMPREHENSIVE TESTING")
+        print("=" * 80)
+        print(f"Testing backend at: {BACKEND_URL}")
+        print()
+        
+        # Run all test suites
+        self.test_health_check()
+        self.test_session_management()
+        self.test_mcp_file_tools()
+        self.test_events_audit_log()
+        self.test_setup_sql()
+        self.cleanup_test_session()
+        
+        # Summary
+        print("=" * 80)
+        print("TEST SUMMARY")
+        print("=" * 80)
+        
+        passed = sum(1 for result in self.test_results if result['success'])
+        total = len(self.test_results)
+        
+        print(f"Total Tests: {total}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {total - passed}")
+        print()
+        
+        if total - passed > 0:
+            print("FAILED TESTS:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"❌ {result['test']}: {result['details']}")
+            print()
+        
+        print(f"Overall Success Rate: {passed}/{total} ({(passed/total)*100:.1f}%)")
+        
+        return passed == total
 
 if __name__ == "__main__":
-    main()
+    tester = MCPTunnelTester()
+    success = tester.run_all_tests()
+    
+    if success:
+        print("\n🎉 ALL TESTS PASSED! Backend is fully operational.")
+    else:
+        print("\n⚠️  Some tests failed. Check details above.")

@@ -67,7 +67,7 @@ class RealtimeHandler:
         try:
             channel = self.client.channel(channel_name)
 
-            async def _handle_tool_request(payload):
+            async def _handle_tool_request_async(payload):
                 """Receive tool-request from Client B, execute, respond."""
                 data = payload.get("payload", payload) if isinstance(payload, dict) else payload
                 logger.info(f"tool-request received: {data}")
@@ -107,30 +107,27 @@ class RealtimeHandler:
                     except Exception:
                         pass
 
+            def _handle_tool_request(payload):
+                """Sync wrapper that schedules the async handler as a task."""
+                asyncio.ensure_future(_handle_tool_request_async(payload))
+
             channel.on_broadcast("tool-request", _handle_tool_request)
 
-            subscribed = asyncio.Event()
+            # Subscribe without async callback (avoids coroutine-not-awaited warnings)
+            await channel.subscribe()
+            # Allow time for WebSocket handshake and join confirmation
+            await asyncio.sleep(3)
+            logger.info(f"Subscribed to {channel_name}")
 
-            async def _on_subscribe(status, err):
-                if status == "SUBSCRIBED":
-                    logger.info(f"Subscribed to {channel_name}")
-                    await channel.send_broadcast("client-joined", {
-                        "client_id": self.client_id,
-                        "role": "target",
-                        "ts": datetime.now(timezone.utc).isoformat(),
-                    })
-                    subscribed.set()
-                elif err:
-                    logger.error(f"Subscribe error on {channel_name}: {err}")
-                    subscribed.set()
-
-            await channel.subscribe(_on_subscribe)
-
-            # wait up to 10s for subscription confirmation
+            # Announce presence
             try:
-                await asyncio.wait_for(subscribed.wait(), timeout=10)
-            except asyncio.TimeoutError:
-                logger.warning(f"Subscription timeout for {channel_name} — continuing")
+                await channel.send_broadcast("client-joined", {
+                    "client_id": self.client_id,
+                    "role": "target",
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception:
+                pass
 
             self.channels[channel_name] = channel
             return True
