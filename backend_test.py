@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 
 class MCPTunnelAPITester:
-    def __init__(self, base_url="https://greeting-app-3852.preview.emergentagent.com"):
+    def __init__(self, base_url="https://supabase-mcp-4.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
