@@ -1,0 +1,26 @@
+[    1513ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ https://assets.emergent.sh/scripts/emergent-main.js:38
+[    1550ms] [WARNING] Supabase env vars not set — Realtime will not work @ https://assets.emergent.sh/scripts/emergent-main.js:38
+[    1552ms] Error: supabaseUrl is required.
+    at validateSupabaseUrl (http://localhost:3000/static/js/bundle.js:65632:26)
+    at new SupabaseClient (http://localhost:3000/static/js/bundle.js:65848:21)
+    at createClient (http://localhost:3000/static/js/bundle.js:66091:10)
+    at ./src/lib/supabase.js (http://localhost:3000/static/js/bundle.js:4085:85)
+    at options.factory (http://localhost:3000/static/js/bundle.js:83103:30)
+    at __webpack_require__ (http://localhost:3000/static/js/bundle.js:82494:32)
+    at fn (http://localhost:3000/static/js/bundle.js:82718:21)
+    at hotRequire (http://localhost:3000/static/js/bundle.js:83086:47)
+    at ./src/App.js (http://localhost:3000/static/js/bundle.js:20:71)
+    at options.factory (http://localhost:3000/static/js/bundle.js:83103:30)
+[   83512ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ https://assets.emergent.sh/scripts/emergent-main.js:38
+[   83520ms] [WARNING] Supabase env vars not set — Realtime will not work @ https://assets.emergent.sh/scripts/emergent-main.js:38
+[   83527ms] Error: supabaseUrl is required.
+    at validateSupabaseUrl (http://localhost:3000/static/js/bundle.js:65632:26)
+    at new SupabaseClient (http://localhost:3000/static/js/bundle.js:65848:21)
+    at createClient (http://localhost:3000/static/js/bundle.js:66091:10)
+    at ./src/lib/supabase.js (http://localhost:3000/static/js/bundle.js:4085:85)
+    at options.factory (http://localhost:3000/static/js/bundle.js:83103:30)
+    at __webpack_require__ (http://localhost:3000/static/js/bundle.js:82494:32)
+    at fn (http://localhost:3000/static/js/bundle.js:82718:21)
+    at hotRequire (http://localhost:3000/static/js/bundle.js:83086:47)
+    at ./src/App.js (http://localhost:3000/static/js/bundle.js:20:71)
+    at options.factory (http://localhost:3000/static/js/bundle.js:83103:30)
