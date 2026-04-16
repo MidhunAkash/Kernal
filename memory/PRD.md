@@ -1,31 +1,61 @@
 # MCP Supabase Tunnel — PRD
 
 ## Problem Statement
-Minimal POC for an MCP (Model Context Protocol) tunnel using Supabase Realtime. Python backend setup to connect to Supabase PostgreSQL via REST API, basic MCP client registration, and `.env` configured with real Supabase credentials.
+MCP tunnel using Supabase Realtime for two-user collaboration. Client A (target/this app) receives file operation commands from Client B (executor) via Supabase Realtime broadcast channels. File operations are sandboxed to a workspace directory.
 
 ## Architecture
-- **Backend**: FastAPI + supabase-py (REST API over HTTPS)
-- **Frontend**: React (minimal dark UI)
-- **Database**: Supabase PostgreSQL (external, via REST API)
-- **Realtime**: Supabase Realtime (ready when table is created with publication enabled)
-- **Agent Skills**: supabase/agent-skills installed at `/app/.agents/skills/`
+- **Backend**: FastAPI + supabase-py (REST API + async Realtime)
+- **Frontend**: React (dark UI with tabbed layout)
+- **Database**: Supabase PostgreSQL (3 tables: mcp_clients, mcp_sessions, mcp_file_events)
+- **Realtime**: Supabase Realtime Broadcast channels per session
+- **Workspace**: `/app/workspace` — sandboxed directory for MCP file operations
 
-## What's Been Implemented (2026-04-16)
-- `.env` configured with `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_PUBLISHABLE_KEY`
-- `server.py` — Supabase REST client, table existence checks, graceful degradation
-- API endpoints: `GET /api/health`, `POST /api/mcp/clients`, `GET /api/mcp/clients`, `DELETE /api/mcp/clients/{id}`, `GET /api/setup-sql`
-- Minimal dark-themed frontend: connection status dashboard, setup SQL section with copy button, client registration form, client list
-- `supabase/agent-skills` and `supabase-postgres-best-practices` installed
-- All tests passing (100% backend, 95% frontend — clipboard sandbox limitation only)
+## What's Been Implemented
+- **MCP File Tools** (9 tools): read_file, write_file, edit_file, list_directory, create_directory, delete_file, move_file, get_file_info, search_files
+- **Realtime Handler**: Async Supabase client connects to session channels, processes tool-request broadcasts from Client B, sends tool-response back
+- **Session Management**: CRUD for sessions, activate/deactivate Realtime listener per session
+- **Workspace REST API**: Direct REST endpoints for all file operations + generic `/api/tools/call` dispatcher
+- **File Events Audit Log**: Persists tool-request/tool-response events to Supabase
+- **Frontend**: 4-tab UI (Dashboard, Sessions, Console, Events)
+  - Dashboard: Connection status, Client A ID, setup SQL
+  - Sessions: Create/list/activate/deactivate/delete sessions
+  - Console: Client B simulator — connect to channel, send tool requests, see responses
+  - Events: Persisted file events log from DB
 
-## Next Steps Required by User
-1. **Create the `mcp_clients` table** — Run the SQL from `/api/setup-sql` in Supabase Dashboard > SQL Editor
-2. Once table exists, all status indicators go green and client registration works
+## Backend Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/health | Connection status |
+| GET | /api/setup-sql | SQL for all tables |
+| GET | /api/tools | List MCP tool schemas |
+| POST | /api/tools/call | Generic tool dispatcher |
+| GET | /api/workspace/list | List directory |
+| GET | /api/workspace/read | Read file |
+| POST | /api/workspace/write | Write file |
+| POST | /api/workspace/edit | Edit file |
+| DELETE | /api/workspace/delete | Delete file/dir |
+| POST | /api/workspace/mkdir | Create directory |
+| POST | /api/workspace/move | Move file |
+| GET | /api/workspace/info | File metadata |
+| GET | /api/workspace/search | Search files |
+| POST | /api/sessions | Create session |
+| GET | /api/sessions | List sessions |
+| GET | /api/sessions/active/list | Active Realtime sessions |
+| GET | /api/sessions/{id} | Get session |
+| DELETE | /api/sessions/{id} | Delete session |
+| POST | /api/sessions/{id}/activate | Start Realtime listener |
+| POST | /api/sessions/{id}/deactivate | Stop Realtime listener |
+| GET | /api/events | File events audit log |
 
-## Backlog (P0/P1/P2)
-- **P0**: User creates table in Supabase SQL Editor
-- **P1**: Supabase Realtime subscription for live client updates
-- **P1**: MCP tunnel relay logic (Client A → Supabase channel → Client B)
-- **P2**: Client heartbeat/ping mechanism
-- **P2**: Tool registration per client
-- **P2**: Message history/audit log
+## Setup Required
+1. Run the SQL from `/api/setup-sql` in Supabase Dashboard > SQL Editor to create tables
+2. Once tables exist, session management and events will work
+3. File operations work independently of Supabase tables
+
+## Realtime Flow
+1. User creates session → backend stores in Supabase
+2. User activates session → backend joins Realtime channel as Client A
+3. Client B (frontend Console tab) connects to same channel
+4. Client B sends tool-request via broadcast
+5. Client A receives, executes tool on workspace filesystem, broadcasts tool-response
+6. Events persisted to mcp_file_events table
