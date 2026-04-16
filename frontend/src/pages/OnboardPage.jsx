@@ -1,312 +1,187 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import "@/App.css";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
-const SKILL_SUGGESTIONS = [
-  "React", "Node.js", "Python", "TypeScript", "Next.js", "FastAPI",
-  "PostgreSQL", "Docker", "AWS", "Supabase", "Rust", "Go", "Vue",
-  "Django", "Rails", "Kubernetes", "GraphQL", "Redis",
-];
-
-const inputStyle = {
-  background: "var(--bg)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  color: "var(--text)",
-  padding: ".5rem .75rem",
-  fontFamily: "inherit",
-  fontSize: ".9rem",
-  outline: "none",
-  width: "100%",
-  transition: "border-color .15s",
-};
-
-export default function OnboardPage() {
-  const { user, updateProfile, loading: authLoading } = useAuth();
+function OnboardPage() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const [displayName, setDisplayName] = useState(
-    user?.user_metadata?.display_name || user?.email?.split("@")[0] || ""
-  );
-  const [bio, setBio] = useState(user?.user_metadata?.bio || "");
-  const [githubUrl, setGithubUrl] = useState(user?.user_metadata?.github_url || "");
-  const [skills, setSkills] = useState(user?.user_metadata?.skills || []);
-  const [skillInput, setSkillInput] = useState("");
-  const [available, setAvailable] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [userProfile, setUserProfile] = useState(null);
+  const [formData, setFormData] = useState({
+    linkedin: "",
+    x: "",
+    github: "",
+  });
 
-  if (authLoading) {
-    return (
-      <div className="shell">
-        <p className="dim mono">Loading…</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-  if (!user) {
-    navigate("/login", { replace: true });
-    return null;
-  }
+        if (error) throw error;
 
-  const addSkill = (skill) => {
-    const s = skill.trim();
-    if (s && !skills.includes(s)) {
-      setSkills([...skills, s]);
-    }
-    setSkillInput("");
-  };
-
-  const removeSkill = (s) => setSkills(skills.filter((x) => x !== s));
-
-  const onSkillKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addSkill(skillInput);
-    } else if (e.key === "Backspace" && !skillInput && skills.length > 0) {
-      setSkills(skills.slice(0, -1));
-    }
-  };
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!displayName.trim()) {
-      setError("Display name is required");
-      return;
-    }
-    setSaving(true);
-    try {
-      const { error: err } = await updateProfile({
-        display_name: displayName.trim(),
-        bio: bio.trim(),
-        github_url: githubUrl.trim(),
-        skills,
-        available,
-        onboarded: true,
-      });
-      if (err) {
-        setError(err.message);
-        return;
+        setUserProfile(data);
+        setFormData({
+          linkedin: data.linkedin || "",
+          x: data.x || "",
+          github: data.github || "",
+        });
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
       }
-      navigate("/jobs", { replace: true });
+    };
+
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({
+          linkedin: formData.linkedin || null,
+          x: formData.x || null,
+          github: formData.github || null,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      navigate("/chat");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("Failed to save profile. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="shell" style={{ maxWidth: "560px", margin: "0 auto" }}>
-      <div className="hdr">
-        <Link to="/" className="nav-link dim" style={{ fontSize: ".8rem" }}>
-          ← home
-        </Link>
-        <h1>Expert profile</h1>
-        <span className="tag mono">onboarding</span>
+  const handleSkip = () => {
+    navigate("/chat");
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
       </div>
+    );
+  }
 
-      <p className="dim" style={{ lineHeight: 1.6, fontSize: ".9rem" }}>
-        Tell targets a bit about yourself so they know who's connecting to their machine.
-      </p>
-
-      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-        {/* Display name */}
-        <div className="card" style={{ gap: ".75rem" }}>
-          <span className="sm dim">Identity</span>
-          <label style={{ display: "flex", flexDirection: "column", gap: ".3rem" }}>
-            <span style={{ fontSize: ".82rem", color: "var(--dim)" }}>Display name *</span>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Alex Chen"
-              style={inputStyle}
-              required
-            />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: ".3rem" }}>
-            <span style={{ fontSize: ".82rem", color: "var(--dim)" }}>GitHub URL (optional)</span>
-            <input
-              value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
-              placeholder="https://github.com/yourhandle"
-              style={inputStyle}
-              type="url"
-            />
-          </label>
-        </div>
-
-        {/* Bio */}
-        <div className="card" style={{ gap: ".75rem" }}>
-          <span className="sm dim">Bio</span>
-          <label style={{ display: "flex", flexDirection: "column", gap: ".3rem" }}>
-            <span style={{ fontSize: ".82rem", color: "var(--dim)" }}>Short bio (optional)</span>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="What do you specialise in? What types of problems do you enjoy solving?"
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
-            />
-          </label>
-        </div>
-
-        {/* Skills */}
-        <div className="card" style={{ gap: ".75rem" }}>
-          <span className="sm dim">Skills</span>
-          {/* Tag input */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: ".4rem",
-              padding: ".4rem .5rem",
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-              minHeight: "2.5rem",
-              alignItems: "center",
-              cursor: "text",
-            }}
-            onClick={() => document.getElementById("skill-input")?.focus()}
-          >
-            {skills.map((s) => (
-              <span
-                key={s}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: ".3rem",
-                  background: "rgba(59,240,138,.1)",
-                  border: "1px solid rgba(59,240,138,.25)",
-                  borderRadius: "4px",
-                  padding: ".15rem .5rem",
-                  fontSize: ".78rem",
-                  color: "var(--accent)",
-                }}
-              >
-                {s}
-                <button
-                  type="button"
-                  onClick={() => removeSkill(s)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--dim)",
-                    fontSize: ".8rem",
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <input
-              id="skill-input"
-              value={skillInput}
-              onChange={(e) => setSkillInput(e.target.value)}
-              onKeyDown={onSkillKeyDown}
-              onBlur={() => skillInput.trim() && addSkill(skillInput)}
-              placeholder={skills.length === 0 ? "Type a skill, press Enter" : ""}
-              style={{
-                background: "none",
-                border: "none",
-                outline: "none",
-                color: "var(--text)",
-                fontSize: ".88rem",
-                minWidth: "120px",
-                flex: 1,
-              }}
-            />
-          </div>
-          {/* Suggestions */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: ".3rem" }}>
-            {SKILL_SUGGESTIONS.filter((s) => !skills.includes(s)).slice(0, 10).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => addSkill(s)}
-                style={{
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "4px",
-                  color: "var(--dim)",
-                  fontSize: ".75rem",
-                  padding: ".15rem .45rem",
-                  cursor: "pointer",
-                }}
-              >
-                + {s}
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <h1 className="text-xl font-black">KERNAL.TECH.HELP</h1>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">Welcome, {user?.user_metadata?.name || user?.email}</span>
+              <button onClick={handleLogout} className="text-sm text-gray-600 hover:text-black" data-testid="logout-btn">
+                Sign Out
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Availability */}
-        <div
-          className="card"
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-        >
-          <div>
-            <div style={{ fontWeight: 600, fontSize: ".9rem" }}>Available for jobs</div>
-            <div className="dim" style={{ fontSize: ".8rem" }}>
-              Show up in listings when targets are looking for experts
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setAvailable(!available)}
-            style={{
-              width: "44px",
-              height: "24px",
-              borderRadius: "12px",
-              background: available ? "var(--accent)" : "var(--border)",
-              border: "none",
-              cursor: "pointer",
-              position: "relative",
-              transition: "background .2s",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                position: "absolute",
-                top: "2px",
-                left: available ? "22px" : "2px",
-                width: "20px",
-                height: "20px",
-                borderRadius: "50%",
-                background: "#fff",
-                transition: "left .2s",
-              }}
-            />
-          </button>
         </div>
+      </header>
 
-        {error && (
-          <div style={{ color: "var(--danger)", fontSize: ".85rem" }}>{error}</div>
-        )}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-black mb-3">Complete Your Profile</h2>
+            <p className="text-gray-600">Add your social links so others can connect with you. All fields are optional.</p>
+          </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="btn"
-          style={{ justifyContent: "center" }}
-        >
-          {saving ? "Saving…" : "Save profile & browse jobs →"}
-        </button>
+          {userProfile && (
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-bold mb-4">Your Account Details</h3>
+              <div className="space-y-2 text-left">
+                <p><span className="font-medium">Name:</span> {userProfile.name || "Not provided"}</p>
+                <p><span className="font-medium">Email:</span> {userProfile.email}</p>
+              </div>
+            </div>
+          )}
 
-        <button
-          type="button"
-          className="dim"
-          onClick={() => navigate("/jobs")}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: ".85rem" }}
-        >
-          Skip for now →
-        </button>
-      </form>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700 mb-2">LinkedIn Profile URL</label>
+              <input
+                type="url" id="linkedin" name="linkedin" value={formData.linkedin} onChange={handleChange}
+                placeholder="https://linkedin.com/in/yourprofile"
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                data-testid="linkedin-input"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="x" className="block text-sm font-medium text-gray-700 mb-2">X (Twitter) Profile URL</label>
+              <input
+                type="url" id="x" name="x" value={formData.x} onChange={handleChange}
+                placeholder="https://x.com/yourhandle"
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                data-testid="x-input"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="github" className="block text-sm font-medium text-gray-700 mb-2">GitHub Profile URL</label>
+              <input
+                type="url" id="github" name="github" value={formData.github} onChange={handleChange}
+                placeholder="https://github.com/yourusername"
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                data-testid="github-input"
+              />
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                type="submit" disabled={saving}
+                className="flex-1 bg-black text-white px-6 py-3 rounded font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="save-profile-btn"
+              >
+                {saving ? "Saving..." : "Save & Continue"}
+              </button>
+              <button
+                type="button" onClick={handleSkip}
+                className="flex-1 border-2 border-gray-300 text-gray-700 px-6 py-3 rounded font-medium hover:bg-gray-50"
+                data-testid="skip-btn"
+              >
+                Skip for Now
+              </button>
+            </div>
+          </form>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            You can update these links anytime from your profile settings.
+          </p>
+        </div>
+      </main>
     </div>
   );
 }
+
+export default OnboardPage;
