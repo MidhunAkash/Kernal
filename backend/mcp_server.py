@@ -31,23 +31,27 @@ mcp = FastMCP(
     "Kernal Workspace",
     transport_security=_mcp_security,
     instructions=(
-        "MCP server for the Kernal project workspace. "
-        "Provides sandboxed file operations (read, write, edit, list, search, etc.) "
-        f"rooted at: {WORKSPACE_ROOT}\n\n"
-        "## IMPORTANT — Connection setup (read this first)\n\n"
-        "This server runs behind a Microsoft Dev Tunnel. Before calling any file "
-        "tools, you MUST:\n\n"
-        "1. Call `workspace_status_check` first (pass job_id if you have one, "
-        "otherwise pass \"none\").\n"
-        "2. Read the `instructions` field in the response — it tells you exactly "
-        "what to do.\n"
-        "3. If the status says the tunnel needs to be trusted, open the URL it "
-        "gives you in a browser (or `curl` it) to clear the Dev Tunnels "
-        "interstitial. You only need to do this once per session.\n"
-        "4. Once status returns `connection: ok`, you can use all workspace_* "
-        "tools normally.\n\n"
-        "If any tool call returns a network error or empty response, call "
-        "`workspace_status_check` again and follow its instructions.\n"
+        "Kernal MCP — bridges Client 2 (expert) to Client 1 (target user).\n\n"
+        "## Quick start for Client 2 (expert agent)\n"
+        "1. Call `connect_to_job(job_id, api_key)` FIRST with the credentials the "
+        "target user shared with you.\n"
+        "2. Read the returned `instructions` — if `target_online: false`, wait and "
+        "call `job_status` again; the target's CLI agent may still be starting.\n"
+        "3. Once `target_online: true`, use the job_* tools below to act on the "
+        "target's local filesystem:\n"
+        "   - `job_list_directory(job_id, api_key, path)`\n"
+        "   - `job_read_file(job_id, api_key, path)`\n"
+        "   - `job_write_file(job_id, api_key, path, content)`\n"
+        "   - `job_edit_file(job_id, api_key, path, old_text, new_text)`\n"
+        "   - `job_search_files(job_id, api_key, pattern, path)`\n"
+        "   - `job_create_directory`, `job_delete_file`, `job_move_file`, "
+        "`job_get_file_info`\n"
+        "4. To preview the target's running app, open the `tunnel_url` returned by "
+        "`job_info` / `connect_to_job` in a browser (or iframe). Changes you make "
+        "via the job_* tools reflect in that preview once the dev server hot-reloads.\n\n"
+        "## Host-local workspace tools (legacy)\n"
+        "The `workspace_*` tools operate on the HOST's /app/workspace, not the "
+        "target's machine. Use the `job_*` tools for the collaboration flow.\n"
     ),
 )
 
@@ -320,3 +324,216 @@ def workspace_status_check(job_id: str = "none") -> str:
                 "Try calling workspace_list_directory to test basic connectivity.",
             ],
         })
+
+
+
+# ═══════════════════════ Job-scoped tools (Client 2 facing) ═══════════════════════
+#
+# These tools forward calls to Client 1's CLI agent over the job-RPC long-polling
+# bridge (see backend/job_rpc.py).  Every tool takes (job_id, api_key) so it can
+# be authenticated statelessly — MCP Streamable-HTTP doesn't offer per-session
+# custom headers reliably across clients.
+
+from job_rpc import job_rpc as _job_rpc  # noqa: E402
+
+
+def _dump(payload) -> str:
+    try:
+        return json.dumps(payload, default=str)
+    except Exception as exc:
+        return json.dumps({"success": False, "error": "serialization_error", "message": str(exc)})
+
+
+async def _call_target(job_id: str, api_key: str, tool: str, arguments: dict, timeout: float = 30.0):
+    try:
+        return await _job_rpc.call_tool(job_id, api_key, tool, arguments, timeout=timeout)
+    except KeyError:
+        return {
+            "success": False,
+            "error": "unknown_job",
+            "message": (
+                f"Job '{job_id}' is not active on this host. The job may have been "
+                "closed or the server restarted. Ask the target user to create a "
+                "new job."
+            ),
+        }
+    except PermissionError:
+        return {
+            "success": False,
+            "error": "invalid_api_key",
+            "message": "The api_key does not match this job_id. Ask the target user for the correct credentials.",
+        }
+
+
+@mcp.tool()
+async def connect_to_job(job_id: str, api_key: str) -> str:
+    """Bind this MCP session to a target user's job. CALL THIS FIRST.
+
+    Validates the api_key, checks if the target's CLI agent is online, and returns
+    the tunnel URL for the live app preview plus actionable `instructions`.
+
+    Args:
+        job_id: UUID shared by the target user.
+        api_key: API key issued with the job.
+    """
+    try:
+        rt_before = _job_rpc.status(job_id)
+        # Touch executor presence so the UI status reflects the connection
+        _job_rpc.touch_executor(job_id)
+    except Exception:
+        rt_before = {"registered": False}
+
+    # Use a trivial no-op by calling agent_pull-like check via status only;
+    # we can't cheaply verify api_key without hitting the runtime map.
+    rt = _job_rpc.get(job_id)
+    if rt is None:
+        return _dump({
+            "success": False,
+            "connected": False,
+            "error": "unknown_job",
+            "instructions": [
+                f"Job '{job_id}' is not known to this host. Possible reasons:",
+                "- The job id is wrong (check with the target user)",
+                "- The host was restarted (in-memory runtime was cleared) — the target needs to re-create the job",
+                "- The job was closed",
+            ],
+        })
+    if rt.api_key != api_key:
+        return _dump({
+            "success": False,
+            "connected": False,
+            "error": "invalid_api_key",
+            "instructions": ["The api_key you supplied does not match this job_id."],
+        })
+
+    _job_rpc.touch_executor(job_id)
+    status = _job_rpc.status(job_id)
+    instructions = []
+    if not status.get("target_online"):
+        instructions.append(
+            "Target is OFFLINE. Ask the target user (Client 1) to run the Kernal "
+            "CLI agent printed on their dashboard. Poll `job_status(job_id, api_key)` "
+            "every few seconds until target_online=true."
+        )
+    else:
+        instructions.append("Target is ONLINE. You can use job_read_file / job_write_file / etc.")
+        if status.get("tunnel_url"):
+            instructions.append(f"Live app preview: {status['tunnel_url']}")
+        else:
+            instructions.append("No tunnel URL yet — the target did not start cloudflared.")
+
+    return _dump({
+        "success": True,
+        "connected": True,
+        "job_id": job_id,
+        "tunnel_url": status.get("tunnel_url", ""),
+        "target_online": status.get("target_online", False),
+        "executor_online": True,
+        "session_id": status.get("session_id", ""),
+        "instructions": instructions,
+    })
+
+
+@mcp.tool()
+def job_status(job_id: str, api_key: str) -> str:
+    """Check whether the target's CLI agent is online and expose the live tunnel URL."""
+    rt = _job_rpc.get(job_id)
+    if rt is None:
+        return _dump({"success": False, "error": "unknown_job"})
+    if rt.api_key != api_key:
+        return _dump({"success": False, "error": "invalid_api_key"})
+    _job_rpc.touch_executor(job_id)
+    return _dump({"success": True, **_job_rpc.status(job_id)})
+
+
+@mcp.tool()
+def job_info(job_id: str, api_key: str) -> str:
+    """Return the job title/context/tunnel_url (useful to quote back to the user)."""
+    rt = _job_rpc.get(job_id)
+    if rt is None:
+        return _dump({"success": False, "error": "unknown_job"})
+    if rt.api_key != api_key:
+        return _dump({"success": False, "error": "invalid_api_key"})
+    _job_rpc.touch_executor(job_id)
+    status = _job_rpc.status(job_id)
+    return _dump({
+        "success": True,
+        "job_id": job_id,
+        "session_id": status.get("session_id", ""),
+        "tunnel_url": status.get("tunnel_url", ""),
+        "target_online": status.get("target_online", False),
+    })
+
+
+@mcp.tool()
+async def job_list_directory(job_id: str, api_key: str, path: str = ".") -> str:
+    """List files/folders in the target's workspace.
+
+    Args:
+        job_id: Job UUID.
+        api_key: API key for the job.
+        path: Relative directory path (default: workspace root).
+    """
+    return _dump(await _call_target(job_id, api_key, "list_directory", {"path": path}))
+
+
+@mcp.tool()
+async def job_read_file(job_id: str, api_key: str, path: str) -> str:
+    """Read a file from the target's workspace."""
+    return _dump(await _call_target(job_id, api_key, "read_file", {"path": path}))
+
+
+@mcp.tool()
+async def job_write_file(job_id: str, api_key: str, path: str, content: str) -> str:
+    """Create or overwrite a file in the target's workspace."""
+    return _dump(await _call_target(job_id, api_key, "write_file", {"path": path, "content": content}))
+
+
+@mcp.tool()
+async def job_edit_file(job_id: str, api_key: str, path: str, old_text: str, new_text: str) -> str:
+    """Search-and-replace text in a file in the target's workspace (first occurrence)."""
+    return _dump(await _call_target(
+        job_id, api_key, "edit_file",
+        {"path": path, "old_text": old_text, "new_text": new_text},
+    ))
+
+
+@mcp.tool()
+async def job_create_directory(job_id: str, api_key: str, path: str) -> str:
+    """Create a directory (including parents) in the target's workspace."""
+    return _dump(await _call_target(job_id, api_key, "create_directory", {"path": path}))
+
+
+@mcp.tool()
+async def job_delete_file(job_id: str, api_key: str, path: str) -> str:
+    """Delete a file or directory from the target's workspace."""
+    return _dump(await _call_target(job_id, api_key, "delete_file", {"path": path}))
+
+
+@mcp.tool()
+async def job_move_file(job_id: str, api_key: str, source: str, destination: str) -> str:
+    """Move or rename a file/directory in the target's workspace."""
+    return _dump(await _call_target(
+        job_id, api_key, "move_file",
+        {"source": source, "destination": destination},
+    ))
+
+
+@mcp.tool()
+async def job_get_file_info(job_id: str, api_key: str, path: str) -> str:
+    """Get metadata (size, mtime, type) for a path in the target's workspace."""
+    return _dump(await _call_target(job_id, api_key, "get_file_info", {"path": path}))
+
+
+@mcp.tool()
+async def job_search_files(job_id: str, api_key: str, pattern: str, path: str = ".") -> str:
+    """Glob-search files in the target's workspace (skips node_modules/.git/.venv).
+
+    Args:
+        pattern: Glob pattern (e.g. "*.py", "*.tsx").
+        path: Directory to search in (default: workspace root).
+    """
+    return _dump(await _call_target(
+        job_id, api_key, "search_files",
+        {"pattern": pattern, "path": path},
+    ))

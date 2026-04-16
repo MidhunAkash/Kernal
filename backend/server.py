@@ -19,6 +19,7 @@ from mcp_tools import (
 )
 from realtime_handler import realtime_handler
 from tunnel_manager import tunnel_manager
+from job_rpc import job_rpc
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1155,6 +1156,317 @@ async def tunnel_status():
 async def tunnel_logs(tail: int = 80):
     """Get recent tunnel process logs."""
     return {"logs": tunnel_manager.get_logs(tail)}
+
+
+# ---------- Simple Job Workflow (Client 1 + CLI agent) ----------
+
+class SimpleJobCreate(BaseModel):
+    title: str
+    context: str = ""
+    local_port: int = 0          # optional — hints the CLI to spawn cloudflared
+    tunnel_url: str = ""         # optional — if user already has one
+    target_name: str = ""        # optional — defaults to "Target (<short-id>)"
+
+
+class AgentHeartbeatBody(BaseModel):
+    client_id: str = ""
+    tunnel_url: str = ""
+    local_port: int = 0
+
+
+class AgentPullBody(BaseModel):
+    client_id: str = ""
+    max_wait: int = 15
+
+
+class AgentRespondBody(BaseModel):
+    request_id: str
+    result: Dict[str, Any] = {}
+
+
+class JobTunnelPatch(BaseModel):
+    tunnel_url: str = ""
+    local_port: int = 0
+
+
+def _public_base_url() -> str:
+    """Return the public base URL (Emergent preview / APP_URL)."""
+    return os.environ.get("APP_URL", BACKEND_URL).rstrip("/")
+
+
+def _require_job_row(job_id: str) -> dict:
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+    result = supabase.table("mcp_jobs").select("*").eq("id", job_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return result.data[0]
+
+
+def _require_job_auth(job_id: str, api_key: Optional[str]) -> dict:
+    """Load job row and verify api_key (stored on the target client's metadata)."""
+    row = _require_job_row(job_id)
+    try:
+        target_row, target_meta = _get_target_client_or_raise(row.get("target_client_id", ""))
+    except HTTPException:
+        raise
+    if not api_key or api_key != target_meta.get("api_key"):
+        raise HTTPException(status_code=401, detail="invalid api_key")
+    # Make sure a runtime exists for this job so queues/presence can be tracked
+    job_rpc.register(job_id, api_key, row.get("session_id", ""))
+    return {"row": row, "target_row": target_row, "target_meta": target_meta}
+
+
+def _build_agent_command(public_base: str, job_id: str, api_key: str, local_port: int = 0) -> str:
+    """One-liner the target user can paste into their terminal."""
+    args = [
+        "--host", public_base,
+        "--job-id", job_id,
+        "--api-key", api_key,
+        "--workspace", ".",
+    ]
+    if local_port:
+        args.extend(["--local-port", str(local_port)])
+    args_str = " ".join(args)
+    return (
+        f'curl -fsSL "{public_base}/api/agent/download" -o kernal_agent.py && '
+        f'python3 -m pip install --quiet requests && '
+        f'python3 kernal_agent.py {args_str}'
+    )
+
+
+def _build_executor_link(public_base: str, job_id: str, api_key: str) -> str:
+    from urllib.parse import urlencode
+    qs = urlencode({"job": job_id, "key": api_key})
+    return f"{public_base}/executor?{qs}"
+
+
+@api_router.post("/jobs/simple")
+async def create_simple_job(body: SimpleJobCreate):
+    """One-shot: create target client + session + job in a single call.
+
+    Returns everything the Client 1 UI needs:
+      - job_id, api_key, session_id
+      - agent_command (copy-paste CLI)
+      - executor_link (share with Client 2)
+      - mcp_config (ready for Cursor / Claude / VS Code)
+    """
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Supabase not available")
+
+    short_id = uuid.uuid4().hex[:6]
+    target_name = body.target_name or f"Target ({short_id})"
+    api_key = _generate_api_key()
+    client_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    try:
+        supabase.table("mcp_sessions").insert({
+            "id": session_id,
+            "name": f"session-{target_name}",
+            "channel_name": f"mcp-session-{session_id}",
+            "status": "active",
+            "created_by": client_id,
+            "created_at": now_iso,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {e}")
+
+    meta = {
+        "role": "target",
+        "api_key": api_key,
+        "session_id": session_id,
+        "target_client_id": "",
+    }
+    try:
+        supabase.table("mcp_clients").insert({
+            "id": client_id,
+            "name": target_name,
+            "description": json.dumps(meta),
+            "status": "registered",
+            "created_at": now_iso,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    job = MCPJob(
+        title=body.title,
+        context=body.context,
+        tunnel_url=body.tunnel_url or "",
+        target_client_id=client_id,
+        session_id=session_id,
+    )
+    try:
+        supabase.table("mcp_jobs").insert({
+            "id": job.id,
+            "title": job.title,
+            "context": job.context,
+            "tunnel_url": job.tunnel_url,
+            "target_client_id": job.target_client_id,
+            "session_id": job.session_id,
+            "status": job.status,
+            "created_at": job.created_at,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Warm up realtime (best-effort; CLI agent path doesn't depend on it, but
+    # keeping it active preserves backwards compat with the /console flow).
+    asyncio.ensure_future(_auto_activate(session_id))
+
+    # Register the job in the RPC registry so CLI heartbeats can attach
+    job_rpc.register(job.id, api_key, session_id)
+
+    public_base = _public_base_url()
+    agent_command = _build_agent_command(public_base, job.id, api_key, body.local_port)
+    executor_link = _build_executor_link(public_base, job.id, api_key)
+    mcp_config = {
+        "mcpServers": {
+            "kernal-workspace": {
+                "url": f"{public_base}/api/mcp",
+            }
+        },
+        "_note": (
+            "After connecting, call `connect_to_job` with the job_id and api_key below."
+        ),
+    }
+
+    return {
+        "job_id": job.id,
+        "api_key": api_key,
+        "session_id": session_id,
+        "target_client_id": client_id,
+        "target_name": target_name,
+        "title": job.title,
+        "context": job.context,
+        "tunnel_url": job.tunnel_url,
+        "local_port": body.local_port,
+        "status": job.status,
+        "created_at": job.created_at,
+        "agent_command": agent_command,
+        "executor_link": executor_link,
+        "mcp_config": mcp_config,
+        "mcp_endpoint": f"{public_base}/api/mcp",
+    }
+
+
+@api_router.patch("/jobs/{job_id}/tunnel")
+async def update_job_tunnel(
+    job_id: str,
+    body: JobTunnelPatch,
+    x_api_key: Optional[str] = Header(None),
+):
+    """Target agent reports its public tunnel URL once cloudflared is ready."""
+    auth = _require_job_auth(job_id, x_api_key)
+    try:
+        supabase.table("mcp_jobs").update({
+            "tunnel_url": body.tunnel_url or auth["row"].get("tunnel_url", ""),
+        }).eq("id", job_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    job_rpc.touch_agent(job_id, tunnel_url=body.tunnel_url, local_port=body.local_port)
+    return {"ok": True, "tunnel_url": body.tunnel_url, "local_port": body.local_port}
+
+
+@api_router.post("/jobs/{job_id}/close")
+async def close_job(job_id: str, x_api_key: Optional[str] = Header(None)):
+    _require_job_auth(job_id, x_api_key)
+    try:
+        supabase.table("mcp_jobs").update({"status": "closed"}).eq("id", job_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    job_rpc.forget(job_id)
+    return {"ok": True, "status": "closed"}
+
+
+@api_router.get("/jobs/{job_id}/public")
+async def get_job_public(job_id: str, api_key: Optional[str] = None):
+    """Projection safe to surface on the executor page (requires api_key)."""
+    auth = _require_job_auth(job_id, api_key)
+    row = auth["row"]
+    rt_status = job_rpc.status(job_id)
+    return {
+        "job_id": job_id,
+        "title": row.get("title", ""),
+        "context": row.get("context", ""),
+        "tunnel_url": row.get("tunnel_url", ""),
+        "session_id": row.get("session_id", ""),
+        "status": row.get("status", "open"),
+        "created_at": row.get("created_at", ""),
+        "runtime": rt_status,
+        "mcp_endpoint": f"{_public_base_url()}/api/mcp",
+    }
+
+
+@api_router.post("/jobs/{job_id}/agent/heartbeat")
+async def agent_heartbeat(
+    job_id: str,
+    body: AgentHeartbeatBody,
+    x_api_key: Optional[str] = Header(None),
+):
+    _require_job_auth(job_id, x_api_key)
+    job_rpc.touch_agent(
+        job_id,
+        client_id=body.client_id,
+        tunnel_url=body.tunnel_url,
+        local_port=body.local_port,
+    )
+    # If a tunnel URL was reported and the DB row doesn't have it yet, persist it
+    if body.tunnel_url:
+        try:
+            supabase.table("mcp_jobs").update(
+                {"tunnel_url": body.tunnel_url}
+            ).eq("id", job_id).execute()
+        except Exception as e:
+            logger.warning(f"failed to persist tunnel_url: {e}")
+    return {"ok": True, "status": job_rpc.status(job_id)}
+
+
+@api_router.post("/jobs/{job_id}/agent/pull")
+async def agent_pull(
+    job_id: str,
+    body: AgentPullBody,
+    x_api_key: Optional[str] = Header(None),
+):
+    _require_job_auth(job_id, x_api_key)
+    if body.client_id:
+        job_rpc.touch_agent(job_id, client_id=body.client_id)
+    try:
+        max_wait = max(1, min(25, int(body.max_wait)))
+    except (TypeError, ValueError):
+        max_wait = 15
+    result = await job_rpc.agent_pull(job_id, x_api_key or "", max_wait=max_wait)
+    return result
+
+
+@api_router.post("/jobs/{job_id}/agent/respond")
+async def agent_respond(
+    job_id: str,
+    body: AgentRespondBody,
+    x_api_key: Optional[str] = Header(None),
+):
+    _require_job_auth(job_id, x_api_key)
+    return job_rpc.agent_respond(job_id, x_api_key or "", body.request_id, body.result or {})
+
+
+@api_router.get("/jobs/{job_id}/runtime")
+async def job_runtime_status(job_id: str, api_key: Optional[str] = None):
+    """Public-but-api_key-protected runtime state (for executor UI polling)."""
+    _require_job_auth(job_id, api_key)
+    return job_rpc.status(job_id)
+
+
+@api_router.get("/agent/download")
+async def agent_download():
+    """Return the kernal_agent.py source so users can `curl | python` it."""
+    from fastapi.responses import FileResponse
+    agent_path = ROOT_DIR / "kernal_agent.py"
+    if not agent_path.exists():
+        raise HTTPException(status_code=500, detail="agent script missing on server")
+    return FileResponse(
+        agent_path, media_type="text/x-python", filename="kernal_agent.py"
+    )
 
 
 # ---------- App wiring ----------
