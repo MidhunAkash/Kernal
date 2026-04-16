@@ -39,7 +39,11 @@ Two personas served in the UX narrative:
 - [x] JobsListing page (/jobs)
 - [x] JobDetails page (/jobs/:jobId) with all 4 states + jobId interpolation in prompt and links
 - [x] data-testid on all interactive/critical elements
-- [x] Verified end-to-end by testing agent (27/27 tests passed, 100%)
+- [x] Verified end-to-end by testing agent (iteration 1: 27/27 tests passed, 100%)
+- [x] **P2: Dark-mode toggle** — `[data-theme="dark"]` variables, Sun/Moon lucide icons, localStorage persistence (`vibecon-theme`), pref-color-scheme fallback, `--bg-inset` token for contrast elements
+- [x] **P2: Chat typing indicator** — bouncing-dots bubble + "Job Poster / typing…" meta; auto-reply from poster after ~1.8s picked from 5 canned strings
+- [x] **P2: Route fade transition** — `.page-fade` keyframe animation on `<main>` keyed by `location.pathname` (260ms opacity + translateY), respects `prefers-reduced-motion`
+- [x] Verified iteration 2: 20/20 tests passed, 0 console errors
 
 ## Backlog
 ### P1
@@ -48,10 +52,9 @@ Two personas served in the UX narrative:
 - Empty-state polish when a jobId is not found
 
 ### P2
-- Dark-mode toggle (design tokens already isolated)
-- Typing indicator in ChatUI while "poster" is composing
-- Subtle page-transition fades between routes
 - Leaderboard of solvers by reward points
+- Toast notifications on Submit / Approved transitions
+- Keyboard shortcuts (e.g., `g j` → jobs)
 
 ## Notes
 - No third-party integrations. No env variables required beyond the template defaults.
