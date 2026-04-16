@@ -13,6 +13,9 @@ export function AuthProvider({ children}) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        ensureUserProfile(session.user);
+      }
       setLoading(false);
     });
 
@@ -22,6 +25,9 @@ export function AuthProvider({ children}) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        ensureUserProfile(session.user);
+      }
       setLoading(false);
     });
 
@@ -41,6 +47,24 @@ export function AuthProvider({ children}) {
       });
 
       if (error) throw error;
+
+      // If user was created successfully, insert into users table
+      if (data.user) {
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: data.user.id,
+              email: data.user.email,
+              name: name,
+            },
+          ]);
+
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          // Don't throw error here - auth succeeded, profile creation can be retried
+        }
+      }
 
       return { success: true, data };
     } catch (error) {
@@ -77,6 +101,35 @@ export function AuthProvider({ children}) {
       return { success: true, data };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  };
+
+  // Helper function to create user profile if it doesn't exist
+  const ensureUserProfile = async (user) => {
+    if (!user) return;
+
+    // Check if user profile exists
+    const { error: fetchError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    // If user doesn't exist, create profile
+    if (fetchError && fetchError.code === 'PGRST116') {
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || user.user_metadata?.full_name || null,
+          },
+        ]);
+
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+      }
     }
   };
 
