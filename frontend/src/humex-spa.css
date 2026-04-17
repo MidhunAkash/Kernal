@@ -661,8 +661,11 @@
   font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Menlo", monospace;
   font-size: 0.82rem;
   line-height: 1.55;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   text-align: left;
+  max-width: 100%;
 }
 
 /* ===================== JOBS LISTING ===================== */
@@ -839,6 +842,8 @@
   flex-direction: column;
   gap: 1.25rem;
   text-align: left;
+  width: 100%;
+  min-width: 0;
 }
 
 .humex-spa .accepted-header-top {
@@ -879,12 +884,18 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
+  min-width: 0;
+}
+
+.humex-spa .config-section > * {
+  min-width: 0;
 }
 
 .humex-spa .links-card {
   display: flex;
   flex-direction: row;
   gap: 1rem;
+  min-width: 0;
 }
 
 .humex-spa .link-item {
@@ -920,9 +931,10 @@
   font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
   font-size: 0.82rem;
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .humex-spa .submit-row {
@@ -1108,6 +1120,95 @@
 
 .humex-spa .notfound-card .hero-sub {
   margin-bottom: 1.25rem;
+}
+
+/* ===================== ACCEPTED JOBS PAGE ===================== */
+.humex-spa .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1.25rem;
+}
+
+.humex-spa .filter-chip {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.45rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.humex-spa .filter-chip:hover {
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.humex-spa .filter-chip.active {
+  background: var(--text-primary);
+  color: var(--bg-card);
+  border-color: var(--text-primary);
+}
+
+.humex-spa .accepted-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.humex-spa .accepted-row-card {
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.humex-spa .accepted-row-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.humex-spa .accepted-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.humex-spa .accepted-row-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4rem 0;
+  color: var(--text-primary);
+}
+
+.humex-spa .accepted-row-sub {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+
+.humex-spa .accepted-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.9rem;
+}
+
+.humex-spa .accepted-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 /* ===================== RESPONSIVE ===================== */

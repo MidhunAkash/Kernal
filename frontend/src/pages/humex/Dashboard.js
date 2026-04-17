@@ -163,6 +163,10 @@ export default function Dashboard() {
                   <span>Browse available jobs</span>
                   <span>→</span>
                 </Button>
+                <Button variant="secondary" onClick={() => navigate("/expert/accepted-jobs")} style={{ justifyContent: "space-between", padding: "1rem" }} data-testid="dashboard-accepted-jobs-btn">
+                  <span>My accepted jobs</span>
+                  <span>→</span>
+                </Button>
                 <Button variant="secondary" onClick={() => navigate("/expert/profile/api-keys")} style={{ justifyContent: "space-between", padding: "1rem" }}>
                   <span>Manage API keys</span>
                   <span>→</span>

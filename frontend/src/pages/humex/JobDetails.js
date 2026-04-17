@@ -403,7 +403,7 @@ Step 3 — When the user asks a question, only use Human MCP tools.`;
                   <div className="link-item" data-testid="tunnel-link">
                     <span className="link-icon">🔗</span>
                     <div className="link-body">
-                      <span className="link-label">Tunnel URL</span>
+                      <span className="link-label">Cloudflare Tunnel</span>
                       {tunnelUrl ? (
                         <a href={tunnelUrl} target="_blank" rel="noreferrer" className="link-url">
                           {tunnelUrl}
@@ -411,21 +411,6 @@ Step 3 — When the user asks a question, only use Human MCP tools.`;
                       ) : (
                         <span className="link-url" style={{ opacity: 0.6 }}>
                           — waiting for target agent —
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="link-item" data-testid="preview-link">
-                    <span className="link-icon">🌐</span>
-                    <div className="link-body">
-                      <span className="link-label">Preview URL</span>
-                      {tunnelUrl ? (
-                        <a href={tunnelUrl} target="_blank" rel="noreferrer" className="link-url">
-                          {tunnelUrl}
-                        </a>
-                      ) : (
-                        <span className="link-url" style={{ opacity: 0.6 }}>
-                          — same as tunnel URL —
                         </span>
                       )}
                     </div>

@@ -14,6 +14,7 @@ import Dashboard from "@/pages/humex/Dashboard";
 import JobsListing from "@/pages/humex/JobsListing";
 import JobDetails from "@/pages/humex/JobDetails";
 import MyJobs from "@/pages/humex/MyJobs";
+import AcceptedJobs from "@/pages/humex/AcceptedJobs";
 import ProfilePage from "@/pages/humex/ProfilePage";
 import TargetPage from "@/pages/TargetPage";
 import ExecutorPage from "@/pages/ExecutorPage";
@@ -44,6 +45,7 @@ export default function RouterApp() {
       <Route path="/expert/jobs" element={<ProtectedRoute><JobsListing /></ProtectedRoute>} />
       <Route path="/expert/jobs/:jobId" element={<ProtectedRoute><JobDetails /></ProtectedRoute>} />
       <Route path="/expert/my-jobs" element={<ProtectedRoute><MyJobs /></ProtectedRoute>} />
+      <Route path="/expert/accepted-jobs" element={<ProtectedRoute><AcceptedJobs /></ProtectedRoute>} />
 
       {/* MCP / Admin routes */}
       <Route path="/target" element={<TargetPage />} />

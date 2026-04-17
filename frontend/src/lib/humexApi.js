@@ -102,6 +102,27 @@ export async function getMcpServerInfo() {
   };
 }
 
+/* ─────────── User-scoped: "Accepted Jobs" (solver-side) ─────────── */
+
+/**
+ * Fetch all jobs this user has accepted as a solver, across every lifecycle
+ * status (accepted / submitted / approved / rejected / closed). Hits Supabase
+ * directly (anon client) because the `mcp_jobs` table has RLS open for anon.
+ */
+export async function getAcceptedJobs(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from("mcp_jobs")
+    .select("*")
+    .eq("solver_uid", userId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn("getAcceptedJobs error:", error.message);
+    return [];
+  }
+  return (data || []).map(normalizeJob).filter(Boolean);
+}
+
 /* ─────────── User-scoped: "Posted Jobs" ─────────── */
 
 export async function getMyJobIds(userId) {

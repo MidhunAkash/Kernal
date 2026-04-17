@@ -187,6 +187,7 @@ function HumExHeader() {
     (location.pathname.startsWith("/expert/jobs/") &&
       !location.pathname.startsWith("/expert/jobs/mine"));
   const onMyJobs = location.pathname.startsWith("/expert/my-jobs");
+  const onAcceptedJobs = location.pathname.startsWith("/expert/accepted-jobs");
   const onProfile = location.pathname.startsWith("/expert/profile");
 
   const handleLogout = async () => {
@@ -235,6 +236,13 @@ function HumExHeader() {
             data-testid="nav-my-jobs"
           >
             Posted Jobs
+          </Link>
+          <Link
+            to="/expert/accepted-jobs"
+            className={`k-nav-link ${onAcceptedJobs ? "active" : ""}`}
+            data-testid="nav-accepted-jobs"
+          >
+            Accepted Jobs
           </Link>
           <Link
             to="/expert/profile"
