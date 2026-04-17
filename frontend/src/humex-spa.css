@@ -1,0 +1,1127 @@
+/* ==========================================================
+   HumEx — post-login SPA styles
+   All rules are scoped under `.humex-spa` so this stylesheet
+   cannot bleed into the existing Tailwind landing/login pages.
+   ========================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+.humex-spa {
+  --bg-page: #f7f7f8;
+  --bg-card: #ffffff;
+  --bg-code: #0a0a0a;
+  --border: #e4e4e7;
+  --border-strong: #d1d1d6;
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+  --text-code: #e4e4e7;
+  --accent: #09090b;
+  --accent-fg: #ffffff;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.04);
+  --shadow-md: 0 4px 12px rgba(9, 9, 11, 0.06);
+  --shadow-lg: 0 8px 24px rgba(9, 9, 11, 0.08);
+  --shadow-hover: 0 10px 28px rgba(9, 9, 11, 0.12);
+  --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  min-height: 100vh;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.humex-spa *,
+.humex-spa *::before,
+.humex-spa *::after {
+  box-sizing: border-box;
+}
+
+.humex-spa p {
+  margin: 0;
+}
+
+.humex-spa h1,
+.humex-spa h2,
+.humex-spa h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* ===================== HEADER ===================== */
+.humex-spa .k-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 56px;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.75rem;
+}
+
+.humex-spa .k-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.humex-spa .k-logo-text {
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+}
+
+.humex-spa .k-logo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-block;
+}
+
+.humex-spa .k-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.humex-spa .k-nav-link {
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color var(--transition);
+}
+
+.humex-spa .k-nav-link:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.humex-spa .k-nav-link.active {
+  color: #ffffff;
+}
+
+.humex-spa .k-nav-btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.42rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition),
+    border-color var(--transition), transform var(--transition);
+  line-height: 1;
+}
+
+.humex-spa .k-nav-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.humex-spa .k-nav-btn-primary {
+  background: #ffffff;
+  color: var(--accent);
+  border-color: #ffffff;
+}
+.humex-spa .k-nav-btn-primary:hover:not(:disabled) {
+  background: #e4e4e7;
+  transform: translateY(-1px);
+}
+
+.humex-spa .k-nav-btn-ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.humex-spa .k-nav-btn-ghost:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.humex-spa .k-nav-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffd66b;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 214, 107, 0.28);
+}
+
+.humex-spa .info-banner {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.8rem 0 0;
+}
+
+.humex-spa .submission-box {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.humex-spa .review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.humex-spa .job-card-review {
+  border-color: #f59e0b;
+  background: linear-gradient(
+    to bottom right,
+    rgba(245, 158, 11, 0.04),
+    var(--bg-card)
+  );
+}
+.humex-spa .job-card-review:hover::after {
+  background: #f59e0b;
+}
+
+.humex-spa .status-pill-gold {
+  background: #059669;
+}
+
+/* ================ API KEY LIST ================ */
+.humex-spa .apikeys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 820px;
+}
+
+.humex-spa .apikey-row {
+  padding: 1.5rem 1.75rem;
+}
+
+.humex-spa .apikey-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.humex-spa .apikey-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.humex-spa .apikey-name {
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.humex-spa .apikey-revoke {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.25);
+}
+.humex-spa .apikey-revoke:hover {
+  background: rgba(185, 28, 28, 0.06);
+  border-color: rgba(185, 28, 28, 0.55);
+}
+
+.humex-spa .apikey-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.humex-spa .apikey-value {
+  flex: 1;
+  min-width: 240px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  padding: 0.55rem 0.8rem;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.humex-spa .apikey-btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+/* ==================== MODAL ==================== */
+.humex-spa .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 9, 11, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5rem 1.25rem 2rem;
+  animation: k-fade-in 140ms ease-out;
+}
+
+.humex-spa .modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.8rem 1.9rem;
+  width: 100%;
+  max-width: 620px;
+  box-shadow: var(--shadow-lg);
+  animation: k-pop-in 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.humex-spa .modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.humex-spa .modal-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0.25rem 0 0;
+}
+
+.humex-spa .modal-sub {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  margin-bottom: 1rem;
+}
+
+.humex-spa .modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.45rem;
+  border-radius: 8px;
+  transition: background var(--transition), color var(--transition);
+}
+.humex-spa .modal-close:hover {
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.humex-spa .modal-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.humex-spa .form-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0.9rem 0 0.35rem;
+}
+
+.humex-spa .form-input,
+.humex-spa .form-textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.humex-spa .form-input:focus,
+.humex-spa .form-textarea:focus {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.humex-spa .form-textarea {
+  resize: vertical;
+  min-height: 96px;
+  font-family: "Inter", sans-serif;
+  line-height: 1.5;
+}
+
+@keyframes k-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes k-pop-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ===================== MAIN LAYOUT ===================== */
+.humex-spa .k-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.humex-spa .k-main-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1.5rem;
+  text-align: center;
+  min-height: calc(100vh - 56px);
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+/* ===================== CARD ===================== */
+.humex-spa .card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.75rem;
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+
+/* ===================== BUTTONS ===================== */
+.humex-spa .btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition),
+    transform var(--transition), border-color var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  line-height: 1;
+}
+
+.humex-spa .btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+.humex-spa .btn-primary:hover {
+  background: #000000;
+  box-shadow: 0 6px 16px rgba(9, 9, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.humex-spa .btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.humex-spa .btn-secondary:hover {
+  background: #efeff1;
+}
+
+.humex-spa .cta-wide {
+  padding: 0.95rem 2.2rem;
+  font-size: 1rem;
+  min-width: 260px;
+}
+
+/* ===================== PILL / BADGES ===================== */
+.humex-spa .pill-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  margin-bottom: 1.25rem;
+}
+
+.humex-spa .count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 0.5rem;
+  margin-left: 0.75rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.humex-spa .job-id-badge {
+  display: inline-block;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-page);
+}
+
+.humex-spa .reward-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.humex-spa .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #059669;
+  color: #ffffff;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.humex-spa .status-pill-sm {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.66rem;
+}
+
+.humex-spa .detail-meta {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.humex-spa .reward-subcaption {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  margin-top: 0.15rem;
+  text-align: center;
+}
+
+.humex-spa .chat-empty {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-style: italic;
+  padding: 1rem 0.5rem;
+  text-align: center;
+}
+
+.humex-spa .server-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.humex-spa .mono-label {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.humex-spa .mono-label.dim {
+  color: var(--text-muted);
+}
+
+.humex-spa .mono-label code {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  color: var(--text-primary);
+}
+
+.humex-spa .section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* ===================== HERO / FIND EXPERT ===================== */
+.humex-spa .find-expert-card {
+  width: 100%;
+  max-width: 580px;
+  text-align: left;
+}
+
+.humex-spa .hero-heading {
+  font-size: 2.25rem;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.6rem;
+}
+
+.humex-spa .hero-sub {
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  margin-bottom: 1.5rem;
+  max-width: 52ch;
+}
+
+/* ===================== CODE BLOCK ===================== */
+.humex-spa .code-block {
+  position: relative;
+  background: var(--bg-code);
+  border: 1px solid #2a2a2a;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  overflow: auto;
+}
+
+.humex-spa .code-block::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5f56;
+  box-shadow: 14px 0 0 #ffbd2e, 28px 0 0 #27c93f;
+}
+
+.humex-spa .code-block pre {
+  margin: 0;
+  margin-top: 1.25rem;
+  color: var(--text-code);
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, "Menlo", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre;
+  text-align: left;
+}
+
+/* ===================== JOBS LISTING ===================== */
+.humex-spa .page-head {
+  margin-bottom: 2rem;
+}
+
+.humex-spa .page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.humex-spa .page-sub {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.humex-spa .jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.humex-spa .job-card {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 1.5rem;
+}
+
+.humex-spa .job-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform var(--transition);
+}
+
+.humex-spa .job-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-strong);
+}
+
+.humex-spa .job-card:hover::after {
+  transform: scaleY(1);
+}
+
+.humex-spa .job-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.humex-spa .job-name {
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+.humex-spa .job-poster {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.humex-spa .job-reward-row {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.humex-spa .job-reward-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.humex-spa .job-reward-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+/* ===================== JOB DETAILS ===================== */
+.humex-spa .breadcrumb {
+  margin-bottom: 1.25rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.humex-spa .crumb-link {
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color var(--transition);
+}
+
+.humex-spa .crumb-link:hover {
+  color: var(--text-primary);
+}
+
+.humex-spa .crumb-sep {
+  color: var(--text-muted);
+}
+
+.humex-spa .crumb-current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.humex-spa .job-detail-card {
+  max-width: 680px;
+}
+
+.humex-spa .detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.humex-spa .detail-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.35rem;
+}
+
+.humex-spa .detail-poster {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.humex-spa .divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.humex-spa .detail-problem {
+  color: var(--text-primary);
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+}
+
+.humex-spa .detail-actions {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ===================== ACCEPTED LAYOUT ===================== */
+.humex-spa .accepted-layout {
+  max-width: 940px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.humex-spa .accepted-header-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.humex-spa .accepted-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.humex-spa .accepted-sub {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.humex-spa .status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  margin: 0 0.1rem 0 0.3rem;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
+}
+.humex-spa .status-dot-green {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+.humex-spa .status-dot-amber {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+
+.humex-spa .config-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.humex-spa .links-card {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.humex-spa .link-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.humex-spa .link-icon {
+  font-size: 1.25rem;
+}
+
+.humex-spa .link-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.humex-spa .link-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.humex-spa .link-url {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.humex-spa .submit-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
+
+/* ===================== CHAT ===================== */
+.humex-spa .chat-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.humex-spa .chat-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.25rem 0.1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+
+.humex-spa .chat-row {
+  display: flex;
+  flex-direction: column;
+  max-width: 78%;
+}
+
+.humex-spa .chat-row-left {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.humex-spa .chat-row-right {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.humex-spa .chat-meta {
+  display: inline-flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.humex-spa .chat-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.humex-spa .chat-bubble {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.humex-spa .bubble-left {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 2px 10px 10px 10px;
+}
+
+.humex-spa .bubble-right {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 10px 2px 10px 10px;
+}
+
+.humex-spa .chat-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.humex-spa .chat-input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.humex-spa .chat-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+/* ===================== STATUS CARDS ===================== */
+.humex-spa .status-card {
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.humex-spa .status-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.humex-spa .status-heading {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.humex-spa .status-sub {
+  color: var(--text-secondary);
+}
+
+.humex-spa .loading-dots {
+  display: inline-flex;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.humex-spa .loading-dots span {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: k-pulse 1.2s ease-in-out infinite;
+}
+
+.humex-spa .loading-dots span:nth-child(1) { animation-delay: 0s; }
+.humex-spa .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.humex-spa .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes k-pulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.4; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+.humex-spa .reward-inset {
+  width: 100%;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.humex-spa .reward-celebrate {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.humex-spa .reward-caption {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.humex-spa .reward-amount {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.humex-spa .notfound-card {
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  padding: 2.5rem 2rem;
+}
+
+.humex-spa .notfound-card .hero-sub {
+  margin-bottom: 1.25rem;
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 768px) {
+  .humex-spa .k-header { padding: 0 1rem; }
+  .humex-spa .k-nav { gap: 1rem; }
+  .humex-spa .k-main { padding: 2rem 1rem 3.5rem; }
+  .humex-spa .k-main-centered { padding-top: 2.5rem; }
+
+  .humex-spa .config-section { grid-template-columns: 1fr; }
+  .humex-spa .links-card { flex-direction: column; }
+  .humex-spa .jobs-grid { grid-template-columns: 1fr; }
+
+  .humex-spa .hero-heading { font-size: 1.8rem; }
+  .humex-spa .page-title { font-size: 1.6rem; }
+  .humex-spa .detail-title { font-size: 1.3rem; }
+}
