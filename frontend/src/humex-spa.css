@@ -479,7 +479,9 @@
 
 /* ===================== PILL / BADGES ===================== */
 .humex-spa .pill-badge {
-  display: inline-block;
+  display: flex;
+  width: fit-content;
+  align-items: center;
   background: var(--accent);
   color: var(--accent-fg);
   font-size: 0.7rem;
@@ -601,6 +603,7 @@
 }
 
 .humex-spa .section-label {
+  display: block;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.12em;
